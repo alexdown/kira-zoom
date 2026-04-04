@@ -120,3 +120,7 @@ async function extractDocxBuffer(buffer: Buffer): Promise<string> {
     throw new Error(`DOCX extraction failed: ${(err as Error).message}`);
   }
 }
+
+// Note: DOCX comment extraction requires direct XML parsing
+// mammoth doesn't extract comments. Use extractDocxComments() for that.
+// See the implementation in the Python scripts or add a Node XML parser.
