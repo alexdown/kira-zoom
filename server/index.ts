@@ -13,6 +13,7 @@ import { createSessionsRouter } from "./routes/sessions.js";
 import { createControlRouter } from "./routes/control.js";
 import { createWebhooksRouter } from "./routes/webhooks.js";
 import { createHeygenRouter } from "./routes/heygen.js";
+import { createDashboardRouter } from "./routes/dashboard.js";
 
 // ──────────────────────────────────────────────
 // Config & Services
@@ -81,6 +82,19 @@ app.use(
   createHeygenRouter(config),
 );
 
+// Dashboard-specific routes (paper analyze, config defaults, etc.)
+app.use(
+  "/api",
+  createDashboardRouter(config, sessionManager, llm),
+);
+
+// Serve dashboard static files (built by Vite)
+app.use("/dashboard", express.static(path.join(__dirname, "../dashboard/dist")));
+// SPA fallback — serve index.html for all /dashboard/* routes
+app.get("/dashboard/*", (_req, res) => {
+  res.sendFile(path.join(__dirname, "../dashboard/dist/index.html"));
+});
+
 // ──────────────────────────────────────────────
 // HTTP + WebSocket server
 // ──────────────────────────────────────────────
@@ -95,6 +109,44 @@ const recallWss = new WebSocketServer({ noServer: true });
 // Avatar command WebSocket (server → client: speak, raise-hand, interrupt)
 const avatarCmdWss = new WebSocketServer({ noServer: true });
 const avatarCmdClients = new Set<WebSocket>();
+
+// Dashboard WebSocket — receives ALL session events (transcript, state, status)
+const dashboardWss = new WebSocketServer({ noServer: true });
+const dashboardClients = new Set<WebSocket>();
+
+/** Broadcast a message to all connected dashboard clients */
+function broadcastDashboard(message: unknown): void {
+  const payload = JSON.stringify(message);
+  for (const ws of dashboardClients) {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(payload);
+    }
+  }
+}
+
+dashboardWss.on("connection", (ws: WebSocket) => {
+  console.log("[DASHBOARD-WS] Client connected");
+  dashboardClients.add(ws);
+
+  // Send current active sessions on connect
+  const sessions = sessionManager.listSessions();
+  const active = sessions.find(s => s.state !== "DONE");
+  if (active) {
+    ws.send(JSON.stringify({ type: "state_change", state: active.state }));
+    // Send existing transcript
+    for (const seg of active.transcript) {
+      ws.send(JSON.stringify({ type: "transcript", speaker: seg.speaker, text: seg.text, timestamp: seg.timestamp }));
+    }
+  }
+
+  ws.on("close", () => {
+    console.log("[DASHBOARD-WS] Client disconnected");
+    dashboardClients.delete(ws);
+  });
+  ws.on("error", (err) => {
+    console.error("[DASHBOARD-WS] Error:", err.message);
+  });
+});
 
 avatarCmdWss.on("connection", (ws: WebSocket) => {
   console.log("[AVATAR-CMD] Client connected");
@@ -142,6 +194,13 @@ recallWss.on("connection", (ws: WebSocket) => {
                   speaker,
                   text,
                 });
+                // Broadcast to dashboard clients
+                broadcastDashboard({
+                  type: "transcript",
+                  speaker,
+                  text,
+                  timestamp: Date.now(),
+                });
               }
             }
           }
@@ -178,6 +237,14 @@ server.on("upgrade", (req, socket, head) => {
   if (url.pathname === "/ws/avatar-commands") {
     avatarCmdWss.handleUpgrade(req, socket, head, (ws) => {
       avatarCmdWss.emit("connection", ws);
+    });
+    return;
+  }
+
+  // Dashboard WebSocket endpoint
+  if (url.pathname === "/ws/dashboard") {
+    dashboardWss.handleUpgrade(req, socket, head, (ws) => {
+      dashboardWss.emit("connection", ws);
     });
     return;
   }
