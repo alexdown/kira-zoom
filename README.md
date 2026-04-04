@@ -76,9 +76,7 @@ The startup script automatically:
 
 - [ ] **Web dashboard** — upload paper, edit questions, join/leave, raise hand, speak, live transcript (spec: [docs/UI_DESIGN.md](docs/UI_DESIGN.md))
 - [ ] **Dynamic context injection** — feed paper content to avatar mid-session via `session.message()` ([#1](https://github.com/alexdown/AIS-test/issues/1))
-- [ ] Auto Q&A detection (detect "any questions?" and auto-raise hand)
-- [ ] Post-meeting transcript download + summary
-- [ ] DOCX comment extraction in dashboard UI
+- [ ] **Auto Q&A detection** — detect "any questions?" in transcript and auto-raise hand
 
 ## CLI Commands
 
