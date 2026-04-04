@@ -1,20 +1,43 @@
 # Kira — AI Meeting Bot
 
-An AI-powered meeting bot that joins Zoom calls, reads research papers, raises her hand during Q&A, and asks intelligent questions aloud. Powered by [Recall.ai](https://recall.ai), Claude on [Amazon Bedrock](https://aws.amazon.com/bedrock/), and [ElevenLabs](https://elevenlabs.io).
+An AI-powered meeting bot that joins Zoom calls, reads papers, raises her hand during Q&A, and asks intelligent questions aloud. Powered by [Recall.ai](https://recall.ai), Claude on [Amazon Bedrock](https://aws.amazon.com/bedrock/), and [ElevenLabs](https://elevenlabs.io).
 
 > **"Hi, I'm Kira, your Amazonian AI."**
 > — Kira, AI Principal Solutions Architect
 
+## Current Status (2026-04-04)
+
+**Working:**
+- ✅ Bot joins Zoom meetings via Recall.ai
+- ✅ Bot speaks in meetings (ElevenLabs TTS → Recall.ai output_audio)
+- ✅ Chat messages (raise hand: "✋ Kira would like to ask a question")
+- ✅ Real-time transcript streaming via WebSocket (recallai_streaming)
+- ✅ Paper analysis → question generation via Claude Opus on Bedrock
+- ✅ Pre-cached TTS for instant question delivery
+
+**In Progress:**
+- 🔧 Transcript streaming reliability (drops after initial utterances)
+- 🔧 HeyGen LiveAvatar integration (animated face + lip sync)
+- 🔧 Full conversation loop (hear → think → speak)
+- 🔧 SSL for webhook endpoints
+
+**Not Yet Started:**
+- ❌ Auto Q&A detection
+- ❌ Web UI dashboard
+- ❌ output_media avatar webpage (blocked by CloudFront WAF)
+
+See [AGENTS.md](AGENTS.md) for detailed learnings and gotchas.
+
 ## Features
 
-- 🤖 **Joins Zoom meetings** via Recall.ai with a custom avatar
+- 🤖 **Joins Zoom meetings** via Recall.ai
 - 📄 **Reads papers** (PDF, DOCX, TXT) and generates ranked Q&A questions
 - 🧠 **Claude-powered analysis** via Amazon Bedrock — generates insightful, context-aware questions
 - 🗣️ **Speaks aloud** in meetings using ElevenLabs TTS
 - ✋ **Raises hand** in chat and pre-generates speech for fast delivery
 - 📝 **Real-time transcription** streamed via WebSocket
 - 🎭 **Customizable personality** — style, intro phrase, system prompt per session
-- 🖥️ **Avatar webpage** rendered as bot camera via Recall.ai
+- 🖥️ **HeyGen LiveAvatar** for animated face (planned)
 
 ## Architecture
 
