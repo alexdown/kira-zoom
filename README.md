@@ -88,17 +88,25 @@ An AI-powered meeting bot that joins Zoom calls, reads papers, raises her hand d
 git clone <repo-url> ai-meeting-bot
 cd ai-meeting-bot
 npm install
+cd client && npm install && cd ..
 
 # 2. Configure environment
 cp .env.example .env
-# Edit .env with your API keys
+# Edit .env with your API keys (Recall.ai, HeyGen, AWS credentials)
 
-# 3. Start a tunnel for webhooks (Recall.ai needs a public URL)
-ssh -R 80:localhost:3000 localhost.run
-# Copy the https://xxxxx.localhost.run URL and set WEBHOOK_BASE_URL in .env
+# 3. Build the avatar client
+cd client && npm run build && cd ..
 
-# 4. Start the server
-npm run dev
+# 4. Start everything (tunnel + server) with one command
+bash scripts/start.sh
+```
+
+The startup script automatically:
+- Starts an HTTPS tunnel via localhost.run (required for Recall.ai output_media)
+- Captures the tunnel URL and updates `.env`
+- Starts the Express server serving both the API and avatar client
+
+> **Note:** You need an SSH key registered with [localhost.run](https://localhost.run) at `~/.ssh/localhost_run`. The tunnel URL changes on each restart — the script handles this automatically.
 
 # 5. Join a meeting
 npx tsx cli/index.ts join --meeting-url "https://zoom.us/j/123456" --paper papers/paper.pdf
