@@ -7,26 +7,28 @@ An AI-powered meeting bot that joins Zoom calls, reads papers, raises her hand d
 
 ## Current Status (2026-04-04)
 
+**✅ FULLY WORKING — Kira joins Zoom with animated avatar, asks questions, follows up conversationally.**
+
 **Working:**
-- ✅ Bot joins Zoom meetings via Recall.ai
-- ✅ Bot speaks in meetings (ElevenLabs TTS → Recall.ai output_audio)
-- ✅ Chat messages (raise hand: "✋ Kira would like to ask a question")
-- ✅ Real-time transcript streaming via WebSocket (recallai_streaming)
+- ✅ Animated HeyGen LiveAvatar ("rika in blue suit") with lip sync
+- ✅ Kira listens to meeting audio and responds in real-time
+- ✅ Asks prepared questions about papers she's read
+- ✅ Follows up on answers naturally — real conversation
+- ✅ Raise hand overlay (✋ on avatar video tile) + chat message
+- ✅ Server-controlled speak commands (inject questions via WebSocket)
+- ✅ Real-time transcript streaming via WebSocket
 - ✅ Paper analysis → question generation via Claude Opus on Bedrock
-- ✅ Pre-cached TTS for instant question delivery
+- ✅ HTTPS tunnel (localhost.run) solves CloudFront WAF for output_media
 
-**In Progress:**
-- 🔧 Transcript streaming reliability (drops after initial utterances)
-- 🔧 HeyGen LiveAvatar integration (animated face + lip sync)
-- 🔧 Full conversation loop (hear → think → speak)
-- 🔧 SSL for webhook endpoints
+**Stack:**
+- **Avatar + Voice:** HeyGen LiveAvatar (handles STT, LLM, TTS, lip sync)
+- **Meeting integration:** Recall.ai (bot joins Zoom, audio I/O, transcript)
+- **Paper analysis:** Claude Opus on Amazon Bedrock
+- **Server:** Express + TypeScript, runs on VPS
+- **Tunnel:** localhost.run for HTTPS
 
-**Not Yet Started:**
-- ❌ Auto Q&A detection
-- ❌ Web UI dashboard
-- ❌ output_media avatar webpage (blocked by CloudFront WAF)
+**Cost per session:** ~$0.50 (Recall.ai) + HeyGen credits (per minute)
 
-See [AGENTS.md](AGENTS.md) for detailed learnings and gotchas.
 
 ## Features
 

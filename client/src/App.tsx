@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { LiveAvatarContextProvider } from "./contexts/LiveAvatarContext";
 import HeyGenAvatar from "./components/HeyGenAvatar";
 import { useServerWS } from "./hooks/useServerWS";
@@ -6,6 +6,7 @@ import Avatar from "./components/Avatar";
 import HandRaised from "./components/HandRaised";
 import Speaking from "./components/Speaking";
 import StatusBar from "./components/StatusBar";
+import { reportDebug } from "./debug";
 
 export type BotState =
   | "JOINING"
@@ -29,28 +30,80 @@ function getParams(): { sessionId: string; avatar: string; botName: string } {
   return {
     sessionId: params.get("sessionId") ?? "",
     avatar: params.get("avatar") ?? "",
-    botName: params.get("botName") ?? "Kira — AI Principal SA",
+    botName: params.get("botName") ?? "Kira (AI Principal SA)",
   };
 }
 
-/**
- * The main app tries HeyGen LiveAvatar first.
- * If the HeyGen connection fails at any point, it falls back to the static avatar.
- */
 export default function App() {
   const { sessionId, avatar, botName } = useMemo(getParams, []);
   const { state, connected } = useServerWS(sessionId);
   const [heygenFailed, setHeygenFailed] = useState(false);
+  const [handRaised, setHandRaised] = useState(false);
+
+  // Reference to the HeyGen session — set by HeyGenAvatar when ready
+  const heygenSessionRef = useRef<any>(null);
 
   const botState: BotState = (state as BotState) || "JOINING";
   const statusText = STATUS_TEXT[botState] ?? botState;
 
   const handleHeygenError = useCallback((error: string) => {
-    console.warn("[App] HeyGen error, falling back to static avatar:", error);
+    console.warn("[App] HeyGen error, falling back:", error);
+    reportDebug("FALLBACK_TRIGGERED", error);
     setHeygenFailed(true);
   }, []);
 
-  // If HeyGen hasn't failed, try the live avatar
+  // Listen for speak/raise-hand commands from control server
+  useEffect(() => {
+    const wsUrl = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/avatar-commands`;
+    let ws: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout>;
+
+    function connect() {
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        console.log("[AvatarCmd] Connected");
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          console.log("[AvatarCmd]", msg.type, msg.text?.substring(0, 40));
+
+          if (msg.type === "speak" && msg.text && heygenSessionRef.current) {
+            if (msg.mode === "exact") {
+              heygenSessionRef.current.repeat(msg.text);
+            } else {
+              heygenSessionRef.current.message(msg.text);
+            }
+            setHandRaised(false); // Lower hand after speaking
+          } else if (msg.type === "interrupt" && heygenSessionRef.current) {
+            heygenSessionRef.current.interrupt();
+          } else if (msg.type === "raise-hand") {
+            setHandRaised(true);
+          } else if (msg.type === "lower-hand") {
+            setHandRaised(false);
+          }
+        } catch (err) {
+          console.error("[AvatarCmd] Parse error:", err);
+        }
+      };
+
+      ws.onclose = () => {
+        reconnectTimer = setTimeout(connect, 5000);
+      };
+
+      ws.onerror = () => {};
+    }
+
+    connect();
+    return () => {
+      clearTimeout(reconnectTimer);
+      ws?.close();
+    };
+  }, []);
+
+  // HeyGen live avatar mode
   if (!heygenFailed) {
     return (
       <div
@@ -62,40 +115,53 @@ export default function App() {
         }}
       >
         <LiveAvatarContextProvider onFatalError={handleHeygenError}>
-          <HeyGenAvatar onError={handleHeygenError} />
+          <HeyGenAvatar onError={handleHeygenError} sessionRef={heygenSessionRef} />
         </LiveAvatarContextProvider>
+
+        {/* Raised hand overlay */}
+        {handRaised && (
+          <div
+            style={{
+              position: "absolute",
+              top: 16,
+              left: 16,
+              zIndex: 100,
+            }}
+          >
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: "50%",
+                background: "rgba(0, 0, 0, 0.7)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 26,
+                animation: "hand-bounce 1s ease-in-out infinite",
+              }}
+            >
+              ✋
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
-  // Fallback: original static avatar UI
+  // Fallback: static avatar
   return (
     <div className="app-container">
       <div className="avatar-stage">
-        <Avatar
-          avatarUrl={avatar}
-          botName={botName}
-          speaking={botState === "SPEAKING"}
-        />
-
-        <div
-          className={`overlay-layer ${botState === "HAND_RAISED" ? "fade-in" : "fade-out"}`}
-        >
+        <Avatar avatarUrl={avatar} botName={botName} speaking={botState === "SPEAKING"} />
+        <div className={`overlay-layer ${botState === "HAND_RAISED" ? "fade-in" : "fade-out"}`}>
           <HandRaised visible={botState === "HAND_RAISED"} />
         </div>
-
-        <div
-          className={`overlay-layer ${botState === "SPEAKING" ? "fade-in" : "fade-out"}`}
-        >
+        <div className={`overlay-layer ${botState === "SPEAKING" ? "fade-in" : "fade-out"}`}>
           <Speaking visible={botState === "SPEAKING"} />
         </div>
       </div>
-
-      <StatusBar
-        botName={botName}
-        statusText={statusText}
-        connected={connected}
-      />
+      <StatusBar botName={botName} statusText={statusText} connected={connected} />
     </div>
   );
 }

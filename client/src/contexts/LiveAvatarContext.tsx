@@ -1,3 +1,4 @@
+import { reportDebug } from "../debug";
 import {
   LiveAvatarSession,
   SessionState,
@@ -86,6 +87,7 @@ export function LiveAvatarContextProvider({
         }
         const data = await response.json();
         if (!cancelled) {
+          reportDebug("token", "success", data.session_id);
           setSessionToken(data.session_token);
           setIsLoadingToken(false);
         }
@@ -95,6 +97,7 @@ export function LiveAvatarContextProvider({
             err instanceof Error ? err.message : "Failed to fetch session token";
           console.error("[LiveAvatar] Token fetch error:", msg);
           setIsLoadingToken(false);
+          reportDebug("token_error", msg);
           onFatalError(msg);
         }
       }

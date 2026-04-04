@@ -1,3 +1,4 @@
+import { reportDebug } from "../debug";
 import { SessionState } from "@heygen/liveavatar-web-sdk";
 import { useEffect, useRef, useState } from "react";
 import { useLiveAvatarContext } from "../contexts/LiveAvatarContext";
@@ -6,19 +7,27 @@ import { useSession } from "../hooks/useSession";
 
 interface HeyGenAvatarProps {
   onError: (error: string) => void;
+  sessionRef: React.MutableRefObject<any>;
 }
 
-export default function HeyGenAvatar({ onError }: HeyGenAvatarProps) {
+export default function HeyGenAvatar({ onError, sessionRef }: HeyGenAvatarProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hasInitialized = useRef(false);
   const [micError, setMicError] = useState<string | null>(null);
 
-  const { isAvatarTalking, sessionError } = useLiveAvatarContext();
+  const { isAvatarTalking, sessionError, sessionRef: heygenSession } = useLiveAvatarContext();
   const { startListening, unmuteMic, isUserTalking } = useLiveAvatarActions();
   const { sessionState, isStreamReady, startSession, attachElement } =
     useSession();
 
   const isConnecting = sessionState === SessionState.CONNECTING;
+
+  // Expose HeyGen session to parent for speak commands
+  useEffect(() => {
+    if (isStreamReady && heygenSession.current) {
+      sessionRef.current = heygenSession.current;
+    }
+  }, [isStreamReady, heygenSession, sessionRef]);
 
   // Attach video element when stream is ready
   useEffect(() => {
@@ -56,17 +65,23 @@ export default function HeyGenAvatar({ onError }: HeyGenAvatarProps) {
         });
 
         // Start the HeyGen session
+        reportDebug("session", "starting");
         await startSession();
+        reportDebug("session", "started");
 
         // Enable voice chat — avatar listens to mic audio + responds
+        reportDebug("voice", "startListening");
         await startListening();
+        reportDebug("voice", "unmuteMic");
         await unmuteMic();
+        reportDebug("voice", "ready");
       } catch (error) {
         console.error("[HeyGen] Session initialization error:", error);
         const msg =
           error instanceof Error
             ? error.message
             : "Failed to initialize session.";
+        reportDebug("init_error", msg);
         setMicError(msg);
       }
     }

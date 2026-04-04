@@ -179,3 +179,66 @@ requests.post(
 - **Real-time transcript WORKED** — received 2 utterances via WS
 - Then stream went silent despite continued speaking
 - Audio output not retested (already proven)
+
+---
+
+## Update: 2026-04-04 08:53 UTC — FULL SYSTEM WORKING! 🎉
+
+### What works now (end-to-end):
+- ✅ HeyGen LiveAvatar with animated lip-synced avatar ("rika in blue suit")
+- ✅ Avatar listens to meeting audio, understands context, responds conversationally
+- ✅ Avatar asks prepared questions about the paper
+- ✅ Avatar follows up on answers naturally
+- ✅ Speak commands via WebSocket (server → client → HeyGen session.message())
+- ✅ Raise hand overlay (✋ emoji on avatar video tile)
+- ✅ Real-time transcript streaming via WebSocket (recallai_streaming)
+- ✅ HTTPS tunnel via localhost.run (solves CloudFront WAF issue)
+
+### Root cause of "avatar not showing" bug:
+**HeyGen credits ran out.** The first session used the remaining credits. Every subsequent attempt failed with "No credits available for start session" — silently falling back to static avatar. NOT a code issue. Added debug reporting to catch this in future.
+
+### Critical: HeyGen credits
+- HeyGen LiveAvatar charges per minute of session time
+- Monitor credits at https://app.liveavatar.com
+- Error message when depleted: "No credits available for start session"
+- Debug endpoint at POST /api/heygen/debug shows the exact error
+
+### Working bot creation template:
+```python
+{
+    "meeting_url": "<ZOOM_URL>",
+    "bot_name": "Kira (AI Principal SA)",
+    "output_media": {"camera": {"kind": "webpage", "config": {"url": "<TUNNEL_HTTPS_URL>"}}},
+    "recording_config": {
+        "transcript": {"provider": {"recallai_streaming": {"language_code": "en"}}},
+        "include_bot_in_recording": {"audio": True},
+        "realtime_endpoints": [{"type": "websocket", "url": "ws://54.83.242.0:3000/ws/recall", "events": ["transcript.data", "transcript.partial_data"]}]
+    },
+    "variant": {"zoom": "web_4_core"}
+}
+```
+
+### Architecture (working):
+```
+Recall.ai bot → loads webpage via output_media (HTTPS tunnel)
+→ Webpage creates HeyGen LiveAvatar session
+→ HeyGen renders animated avatar + handles STT/LLM/TTS
+→ Avatar video + audio stream → bot camera → Zoom meeting
+→ Meeting audio → bot mic → HeyGen (listens + responds)
+→ Control server can inject speak/raise-hand commands via WebSocket
+→ Transcript streams back to server via separate WebSocket
+```
+
+### Startup sequence:
+1. Start localhost.run tunnel: `ssh -i ~/.ssh/localhost_run -R 80:localhost:3000 ssh.localhost.run`
+2. Note the HTTPS URL, update .env
+3. Start server: `npx tsx server/index.ts`
+4. Create bot via Recall.ai API with output_media pointing to tunnel URL
+5. Admit bot from Zoom waiting room
+6. HeyGen connects, avatar appears, Kira is live
+
+### Test 5 (2026-04-04 ~08:50 UTC) — SUCCESS ✅
+- Bot: `91075930`
+- HeyGen avatar visible and animated
+- Kira listened, asked questions, followed up on answers
+- Full conversational AI in Zoom meeting — WORKING

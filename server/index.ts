@@ -224,3 +224,10 @@ server.listen(config.port, () => {
 });
 
 export { config, sessionManager, recall, speaker, llm };
+
+// Debug endpoint — client reports HeyGen errors here
+app.post("/api/heygen/debug", (req, res) => {
+  const { error, stage, details } = req.body as { error?: string; stage?: string; details?: string };
+  console.error(`[HEYGEN-DEBUG] Stage: ${stage} | Error: ${error} | Details: ${details}`);
+  res.json({ received: true });
+});
