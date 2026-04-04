@@ -32,14 +32,26 @@ An AI-powered meeting bot that joins Zoom calls, reads papers, raises her hand d
 
 ## Features
 
-- 🤖 **Joins Zoom meetings** via Recall.ai
+- 🤖 **Joins Zoom meetings** via Recall.ai with animated HeyGen LiveAvatar
 - 📄 **Reads papers** (PDF, DOCX, TXT) and generates ranked Q&A questions
 - 🧠 **Claude-powered analysis** via Amazon Bedrock — generates insightful, context-aware questions
-- 🗣️ **Speaks aloud** in meetings using ElevenLabs TTS
-- ✋ **Raises hand** in chat and pre-generates speech for fast delivery
+- 🗣️ **Speaks aloud** in meetings with lip-synced avatar (HeyGen LiveAvatar)
+- ✋ **Raises hand** — visual overlay on avatar tile + chat message
 - 📝 **Real-time transcription** streamed via WebSocket
-- 🎭 **Customizable personality** — style, intro phrase, system prompt per session
-- 🖥️ **HeyGen LiveAvatar** for animated face (planned)
+- 🎭 **Customizable personality** — system prompt, voice, avatar appearance
+- 🖥️ **Web dashboard** (coming soon) — upload papers, edit questions, control Kira from your browser
+- 🔧 **CLI + API** for programmatic control
+
+## Roadmap
+
+- [x] Animated avatar joins Zoom with lip sync (HeyGen LiveAvatar)
+- [x] Paper analysis + question generation (Claude Opus on Bedrock)
+- [x] Raise hand (chat + visual overlay)
+- [x] Server-controlled speak commands
+- [x] Real-time transcript streaming
+- [ ] **Web dashboard** — upload paper, edit questions, join/leave, raise hand, speak, live transcript (spec: [docs/UI_DESIGN.md](docs/UI_DESIGN.md))
+- [ ] Auto Q&A detection (detect "any questions?" and auto-raise hand)
+- [ ] Post-meeting transcript download + summary
 
 ## Architecture
 
