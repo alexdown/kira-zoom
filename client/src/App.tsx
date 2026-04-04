@@ -119,9 +119,8 @@ export default function App() {
           <div
             style={{
               position: "fixed",
-              bottom: 8,
-              left: "50%",
-              transform: "translateX(-50%)",
+              top: 12,
+              left: 12,
               zIndex: 99999,
               pointerEvents: "none",
               display: "flex",
