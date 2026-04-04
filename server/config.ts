@@ -53,7 +53,7 @@ export function loadConfig(): Config {
     port: parseInt(process.env.PORT ?? "3000", 10),
     webhookBaseUrl: process.env.WEBHOOK_BASE_URL ?? "http://localhost:3000",
     avatarPublicUrl: process.env.AVATAR_PUBLIC_URL ?? "http://localhost:5173",
-    defaultBotName: process.env.DEFAULT_BOT_NAME ?? "Kira \u2014 AI Principal SA",
+    defaultBotName: process.env.DEFAULT_BOT_NAME ?? "Kira (AI Principal SA)",
     defaultTtsVoice: process.env.DEFAULT_TTS_VOICE ?? "Rachel",
     defaultSystemPrompt: process.env.SYSTEM_PROMPT ?? DEFAULT_SYSTEM_PROMPT,
     // HeyGen LiveAvatar

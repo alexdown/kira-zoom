@@ -29,7 +29,7 @@ const initialState: DashboardState = {
   autoScroll: true,
   meeting: {
     zoomUrl: '',
-    botName: 'Kira — AI Principal SA',
+    botName: 'Kira (AI Principal SA)',
     isJoining: false,
     isLeaving: false,
   },
