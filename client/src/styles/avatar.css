@@ -246,3 +246,25 @@
   font-weight: 400;
   opacity: 0.75;
 }
+
+/* ===== HeyGen LiveAvatar Animations ===== */
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
+}

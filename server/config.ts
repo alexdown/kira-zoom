@@ -24,6 +24,11 @@ export interface Config {
   defaultBotName: string;
   defaultTtsVoice: string;
   defaultSystemPrompt: string;
+  // HeyGen LiveAvatar
+  heygenApiKey: string;
+  heygenAvatarId: string;
+  heygenVoiceId: string;
+  heygenContextId: string;
 }
 
 function requireEnv(name: string): string {
@@ -51,5 +56,13 @@ export function loadConfig(): Config {
     defaultBotName: process.env.DEFAULT_BOT_NAME ?? "Kira \u2014 AI Principal SA",
     defaultTtsVoice: process.env.DEFAULT_TTS_VOICE ?? "Rachel",
     defaultSystemPrompt: process.env.SYSTEM_PROMPT ?? DEFAULT_SYSTEM_PROMPT,
+    // HeyGen LiveAvatar
+    heygenApiKey: process.env.HEYGEN_API_KEY ?? "",
+    heygenAvatarId:
+      process.env.HEYGEN_AVATAR_ID ?? "0aae6046-0ab9-44fe-a08d-c5ac3f406d34",
+    heygenVoiceId:
+      process.env.HEYGEN_VOICE_ID ?? "b2bd6569-a537-4342-aeca-a1f15d2a2c97",
+    heygenContextId:
+      process.env.HEYGEN_CONTEXT_ID ?? "4aff4b76-74af-4329-8910-705585d08fad",
   };
 }

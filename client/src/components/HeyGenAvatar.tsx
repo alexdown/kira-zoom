@@ -1,0 +1,204 @@
+import { SessionState } from "@heygen/liveavatar-web-sdk";
+import { useEffect, useRef, useState } from "react";
+import { useLiveAvatarContext } from "../contexts/LiveAvatarContext";
+import { useLiveAvatarActions } from "../hooks/useLiveAvatarActions";
+import { useSession } from "../hooks/useSession";
+
+interface HeyGenAvatarProps {
+  onError: (error: string) => void;
+}
+
+export default function HeyGenAvatar({ onError }: HeyGenAvatarProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const hasInitialized = useRef(false);
+  const [micError, setMicError] = useState<string | null>(null);
+
+  const { isAvatarTalking, sessionError } = useLiveAvatarContext();
+  const { startListening, unmuteMic, isUserTalking } = useLiveAvatarActions();
+  const { sessionState, isStreamReady, startSession, attachElement } =
+    useSession();
+
+  const isConnecting = sessionState === SessionState.CONNECTING;
+
+  // Attach video element when stream is ready
+  useEffect(() => {
+    if (isStreamReady && videoRef.current) {
+      attachElement(videoRef.current);
+    }
+  }, [isStreamReady, attachElement]);
+
+  // Report errors to parent for fallback
+  useEffect(() => {
+    if (sessionError) {
+      onError(sessionError);
+    }
+  }, [sessionError, onError]);
+
+  useEffect(() => {
+    if (micError) {
+      onError(micError);
+    }
+  }, [micError, onError]);
+
+  // Request mic permission, start session, and enable mic for user
+  useEffect(() => {
+    if (sessionState !== SessionState.INACTIVE || hasInitialized.current) {
+      return;
+    }
+    hasInitialized.current = true;
+
+    async function initializeSession() {
+      try {
+        // Request mic permission
+        // In Recall.ai bot browser this is auto-accepted
+        await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+
+        // Start the HeyGen session
+        await startSession();
+
+        // Enable voice chat — avatar listens to mic audio + responds
+        await startListening();
+        await unmuteMic();
+      } catch (error) {
+        console.error("[HeyGen] Session initialization error:", error);
+        const msg =
+          error instanceof Error
+            ? error.message
+            : "Failed to initialize session.";
+        setMicError(msg);
+      }
+    }
+
+    void initializeSession();
+  }, [sessionState, startSession, startListening, unmuteMic]);
+
+  return (
+    <>
+      {/* Avatar Video - Full Screen */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+        }}
+      />
+
+      {/* Loading/Connecting State */}
+      {!isStreamReady && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div style={{ textAlign: "center" }}>
+            <div
+              style={{
+                width: 80,
+                height: 80,
+                border: "4px solid #8b5cf6",
+                borderTopColor: "transparent",
+                borderRadius: "50%",
+                animation: "spin 1s linear infinite",
+                margin: "0 auto 16px",
+              }}
+            />
+            <p
+              style={{
+                fontSize: 20,
+                color: "#cbd5e1",
+                fontFamily: "sans-serif",
+              }}
+            >
+              {isConnecting
+                ? "Connecting to avatar..."
+                : "Starting avatar session..."}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Speaking Indicators */}
+      {isStreamReady && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 32,
+            left: "50%",
+            transform: "translateX(-50%)",
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+          }}
+        >
+          {isAvatarTalking && (
+            <div
+              style={{
+                padding: "8px 16px",
+                borderRadius: 9999,
+                background: "rgba(139, 92, 246, 0.9)",
+                color: "white",
+                fontSize: 14,
+                fontWeight: 500,
+                fontFamily: "sans-serif",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                backdropFilter: "blur(8px)",
+              }}
+            >
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  background: "white",
+                  borderRadius: "50%",
+                  animation: "pulse-dot 1.5s ease-in-out infinite",
+                }}
+              />
+              Kira speaking
+            </div>
+          )}
+          {isUserTalking && (
+            <div
+              style={{
+                padding: "8px 16px",
+                borderRadius: 9999,
+                background: "rgba(16, 185, 129, 0.9)",
+                color: "white",
+                fontSize: 14,
+                fontWeight: 500,
+                fontFamily: "sans-serif",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                backdropFilter: "blur(8px)",
+              }}
+            >
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  background: "white",
+                  borderRadius: "50%",
+                  animation: "pulse-dot 1.5s ease-in-out infinite",
+                }}
+              />
+              Listening
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}

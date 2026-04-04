@@ -1,5 +1,7 @@
 import "dotenv/config";
 import http from "node:http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express from "express";
 import { WebSocketServer, WebSocket } from "ws";
 import { loadConfig } from "./config.js";
@@ -10,6 +12,7 @@ import { LLMService } from "./services/llm.js";
 import { createSessionsRouter } from "./routes/sessions.js";
 import { createControlRouter } from "./routes/control.js";
 import { createWebhooksRouter } from "./routes/webhooks.js";
+import { createHeygenRouter } from "./routes/heygen.js";
 
 // ──────────────────────────────────────────────
 // Config & Services
@@ -51,6 +54,10 @@ const app = express();
 
 app.use(express.json({ limit: "10mb" }));
 
+// Serve client static files (built by Vite)
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+app.use(express.static(path.join(__dirname, "../client/dist")));
+
 // Health check
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
@@ -68,6 +75,10 @@ app.use(
 app.use(
   "/api/webhooks",
   createWebhooksRouter(sessionManager, broadcast),
+);
+app.use(
+  "/api/heygen",
+  createHeygenRouter(config),
 );
 
 // ──────────────────────────────────────────────
