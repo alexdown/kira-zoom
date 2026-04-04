@@ -254,3 +254,10 @@ Recall.ai bot → loads webpage via output_media (HTTPS tunnel)
 - The "No credits available for start session" error is SILENT — falls back to static avatar with no obvious error
 - Always verify credits at https://app.liveavatar.com before deploying Kira
 - Debug endpoint POST /api/heygen/debug catches this — check server logs for "FALLBACK_TRIGGERED"
+
+### 13. Port 3000 no longer needs to be open
+- All traffic goes through the localhost.run HTTPS tunnel
+- Bot creation uses `wss://<tunnel>/ws/recall` for transcript streaming (not `ws://54.83.242.0:3000`)
+- Dashboard accessible via `https://<tunnel>/dashboard/`
+- Recall.ai output_media uses `https://<tunnel>/` for avatar webpage
+- No direct access to port 3000 needed from the internet
