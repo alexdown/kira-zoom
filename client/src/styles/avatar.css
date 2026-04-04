@@ -1,0 +1,248 @@
+/* ===== Base Layout ===== */
+
+.app-container {
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #ffffff;
+  position: relative;
+}
+
+.avatar-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+}
+
+/* ===== Avatar ===== */
+
+.avatar-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.avatar-circle {
+  width: min(55vw, 55vh);
+  height: min(55vw, 55vh);
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 40px rgba(99, 102, 241, 0.3);
+  transition: border-color 0.4s ease, box-shadow 0.4s ease;
+  flex-shrink: 0;
+}
+
+.avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.avatar-name {
+  font-size: clamp(16px, 3vw, 28px);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  opacity: 0.9;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* ===== Speaking Pulse ===== */
+
+.speaking-pulse {
+  border-color: #2dd4bf !important;
+  box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.5) !important;
+  animation: pulse-border 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+  0% {
+    box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.5);
+    border-color: #2dd4bf;
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(45, 212, 191, 0);
+    border-color: #5eead4;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.5);
+    border-color: #2dd4bf;
+  }
+}
+
+/* ===== Overlay Layer ===== */
+
+.overlay-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+/* ===== Fade ===== */
+
+.fade-in {
+  opacity: 1;
+}
+
+.fade-out {
+  opacity: 0;
+}
+
+/* ===== Hand Raised ===== */
+
+.hand-raised-container {
+  position: absolute;
+  top: 8%;
+  right: 12%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.hand-glow {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.35) 0%, transparent 70%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hand-emoji {
+  font-size: 64px;
+  line-height: 1;
+  display: block;
+}
+
+.hand-bounce {
+  animation: bounce-hand 1s ease-in-out infinite;
+}
+
+@keyframes bounce-hand {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+.hand-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #fbbf24;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+}
+
+/* ===== Speaking / Waveform ===== */
+
+.speaking-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: calc(min(55vw, 55vh) / 2 + 60px);
+}
+
+.waveform {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  height: 40px;
+}
+
+.waveform-bar {
+  width: 6px;
+  background: #2dd4bf;
+  border-radius: 3px;
+  animation: wave 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes wave {
+  0% {
+    height: 8px;
+    opacity: 0.6;
+  }
+  100% {
+    height: 36px;
+    opacity: 1;
+  }
+}
+
+.speaking-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #2dd4bf;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+/* ===== Status Bar ===== */
+
+.status-bar {
+  width: 100%;
+  padding: 10px 20px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.status-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.connection-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.connection-dot.connected {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+}
+
+.connection-dot.disconnected {
+  background: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+}
+
+.status-bot-name {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.status-bar-right {
+  display: flex;
+  align-items: center;
+}
+
+.status-text {
+  font-size: 13px;
+  font-weight: 400;
+  opacity: 0.75;
+}
