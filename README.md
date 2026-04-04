@@ -74,9 +74,10 @@ The startup script automatically:
 
 ## Roadmap
 
-- [ ] **Web dashboard** — upload paper, edit questions, join/leave, raise hand, speak, live transcript (spec: [docs/UI_DESIGN.md](docs/UI_DESIGN.md))
+- [ ] **Web dashboard** — upload paper, edit questions, join/leave, raise hand, speak, live transcript. Phase 1 merged ([`f5aa9b4`](https://github.com/alexdown/AIS-test/commit/f5aa9b4)), needs end-to-end testing. Spec: [docs/UI_DESIGN.md](docs/UI_DESIGN.md)
 - [ ] **Dynamic context injection** — feed paper content to avatar mid-session via `session.message()` ([#1](https://github.com/alexdown/AIS-test/issues/1))
-- [ ] **Auto Q&A detection** — detect "any questions?" in transcript and auto-raise hand
+- [ ] **Detect when Kira is addressed** — ensure she responds to direct questions by name ([#2](https://github.com/alexdown/AIS-test/issues/2))
+- [ ] **DOCX comments in dashboard** — extract inline comments on upload, display in UI, auto-include in avatar context ([#3](https://github.com/alexdown/AIS-test/issues/3))
 
 ## CLI Commands
 
