@@ -242,3 +242,15 @@ Recall.ai bot → loads webpage via output_media (HTTPS tunnel)
 - HeyGen avatar visible and animated
 - Kira listened, asked questions, followed up on answers
 - Full conversational AI in Zoom meeting — WORKING
+
+### 11. NEVER restart the server while Kira is in a call
+- **Problem:** Restarting the Express server kills the HeyGen WebRTC session. The bot's browser reloads the page but HeyGen can't recover — it needs a brand new bot + session.
+- **Effect:** Avatar falls back to "Starting avatar session" spinner permanently
+- **Rule:** If you need to change server code while Kira is in a meeting, DON'T restart. Wait until the meeting ends, or create a new bot after restart.
+- **If you must restart mid-meeting:** Kill old bot → restart server → create new bot → have host admit new bot
+- **Client-only changes (CSS, React components):** Require `npm run build` in client/ which is safe, BUT the running bot won't pick up the new build until a new bot is created. The Recall.ai bot caches the webpage on first load.
+
+### 12. HeyGen credits check before every meeting
+- The "No credits available for start session" error is SILENT — falls back to static avatar with no obvious error
+- Always verify credits at https://app.liveavatar.com before deploying Kira
+- Debug endpoint POST /api/heygen/debug catches this — check server logs for "FALLBACK_TRIGGERED"

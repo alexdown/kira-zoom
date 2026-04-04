@@ -114,37 +114,44 @@ export default function App() {
           overflow: "hidden",
         }}
       >
-        <LiveAvatarContextProvider onFatalError={handleHeygenError}>
-          <HeyGenAvatar onError={handleHeygenError} sessionRef={heygenSessionRef} />
-        </LiveAvatarContextProvider>
-
-        {/* Raised hand overlay */}
+        {/* Zoom-style raised hand overlay */}
         {handRaised && (
           <div
             style={{
-              position: "absolute",
-              top: 16,
-              left: 16,
-              zIndex: 100,
+              position: "fixed",
+              bottom: 8,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 99999,
+              pointerEvents: "none",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
             }}
           >
             <div
               style={{
-                width: 44,
-                height: 44,
-                borderRadius: "50%",
-                background: "rgba(0, 0, 0, 0.7)",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
-                fontSize: 26,
-                animation: "hand-bounce 1s ease-in-out infinite",
+                background: "rgba(0, 0, 0, 0.8)",
+                borderRadius: 8,
+                padding: "8px 12px",
+                gap: 8,
               }}
             >
-              ✋
+              <img
+                src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/270b.svg"
+                alt="✋"
+                style={{ width: 22, height: 22 }}
+              />
+              <span style={{ color: "white", fontSize: 16, fontFamily: "Arial, Helvetica, sans-serif", fontWeight: 500 }}>1</span>
             </div>
           </div>
         )}
+
+        <LiveAvatarContextProvider onFatalError={handleHeygenError}>
+          <HeyGenAvatar onError={handleHeygenError} sessionRef={heygenSessionRef} />
+        </LiveAvatarContextProvider>
       </div>
     );
   }

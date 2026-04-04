@@ -92,6 +92,23 @@ const wss = new WebSocketServer({ noServer: true });
 // Separate WSS for Recall.ai real-time data
 const recallWss = new WebSocketServer({ noServer: true });
 
+// Avatar command WebSocket (server → client: speak, raise-hand, interrupt)
+const avatarCmdWss = new WebSocketServer({ noServer: true });
+const avatarCmdClients = new Set<WebSocket>();
+
+avatarCmdWss.on("connection", (ws: WebSocket) => {
+  console.log("[AVATAR-CMD] Client connected");
+  avatarCmdClients.add(ws);
+  ws.on("close", () => { console.log("[AVATAR-CMD] Client disconnected"); avatarCmdClients.delete(ws); });
+});
+
+function sendAvatarCommand(command: { type: string; text?: string; mode?: string }) {
+  const payload = JSON.stringify(command);
+  for (const client of avatarCmdClients) {
+    if (client.readyState === WebSocket.OPEN) client.send(payload);
+  }
+}
+
 recallWss.on("connection", (ws: WebSocket) => {
   console.log("[RECALL-WS] Recall.ai connected for real-time streaming");
 
@@ -158,6 +175,13 @@ server.on("upgrade", (req, socket, head) => {
     return;
   }
 
+  if (url.pathname === "/ws/avatar-commands") {
+    avatarCmdWss.handleUpgrade(req, socket, head, (ws) => {
+      avatarCmdWss.emit("connection", ws);
+    });
+    return;
+  }
+
   // Avatar webpage endpoint
   const match = url.pathname.match(/^\/ws\/sessions\/([^/]+)$/);
   if (!match) {
@@ -210,6 +234,33 @@ wss.on("connection", (ws: WebSocket, sessionId: string) => {
 // ──────────────────────────────────────────────
 // Start
 // ──────────────────────────────────────────────
+
+// Avatar speak command
+app.post("/api/avatar/speak", (req, res) => {
+  const { text, mode } = req.body as { text?: string; mode?: string };
+  if (!text) { res.status(400).json({ error: "No text" }); return; }
+  console.log(`[AVATAR-SPEAK] ${text.substring(0, 80)}...`);
+  sendAvatarCommand({ type: "speak", text, mode: mode ?? "message" });
+  res.json({ status: "sent", connectedClients: avatarCmdClients.size });
+});
+
+// Avatar raise hand
+app.post("/api/avatar/raise-hand", async (req, res) => {
+  const { botId, message } = req.body as { botId?: string; message?: string };
+  console.log("[AVATAR] Raising hand...");
+  sendAvatarCommand({ type: "raise-hand" });
+  if (botId) {
+    try { await recall.sendChatMessage(botId, message ?? "✋ Kira would like to ask a question"); }
+    catch (err) { console.error("[AVATAR] Chat failed:", err); }
+  }
+  res.json({ status: "hand_raised" });
+});
+
+// Avatar lower hand
+app.post("/api/avatar/lower-hand", (_req, res) => {
+  sendAvatarCommand({ type: "lower-hand" });
+  res.json({ status: "hand_lowered" });
+});
 
 server.listen(config.port, () => {
   console.log(`
