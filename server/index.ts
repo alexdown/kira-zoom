@@ -78,11 +78,77 @@ const server = http.createServer(app);
 
 const wss = new WebSocketServer({ noServer: true });
 
-// Handle upgrade requests to route /ws/sessions/:id
+// Separate WSS for Recall.ai real-time data
+const recallWss = new WebSocketServer({ noServer: true });
+
+recallWss.on("connection", (ws: WebSocket) => {
+  console.log("[RECALL-WS] Recall.ai connected for real-time streaming");
+
+  ws.on("message", (data) => {
+    try {
+      const msg = JSON.parse(data.toString());
+      const event = msg.event ?? msg.type ?? "unknown";
+
+      if (event === "transcript.data" || event === "transcript.partial_data") {
+        const words = msg.data?.data?.words ?? [];
+        const text = words.map((w: { text: string }) => w.text).join(" ");
+        const speaker = msg.data?.data?.participant?.name ?? "Unknown";
+        const isPartial = event === "transcript.partial_data";
+
+        if (text.trim()) {
+          console.log(`  [${speaker}]${isPartial ? " (partial)" : ""}: ${text}`);
+
+          // Find active session and add transcript
+          const sessions = sessionManager.listSessions();
+          for (const session of sessions) {
+            if (session.state === "LISTENING" || session.state === "HAND_RAISED" || session.state === "SPEAKING") {
+              if (!isPartial) {
+                sessionManager.addTranscript(session.id, {
+                  speaker,
+                  text,
+                  timestamp: Date.now(),
+                });
+                // Broadcast to avatar clients
+                broadcast(session.id, {
+                  type: "transcript",
+                  speaker,
+                  text,
+                });
+              }
+            }
+          }
+        }
+      } else {
+        console.log(`[RECALL-WS] Event: ${event}`);
+      }
+    } catch (err) {
+      console.error("[RECALL-WS] Parse error:", (err as Error).message);
+    }
+  });
+
+  ws.on("close", () => {
+    console.log("[RECALL-WS] Recall.ai disconnected");
+  });
+
+  ws.on("error", (err) => {
+    console.error("[RECALL-WS] Error:", err.message);
+  });
+});
+
+// Handle upgrade requests to route /ws/sessions/:id or /ws/recall
 server.on("upgrade", (req, socket, head) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
-  const match = url.pathname.match(/^\/ws\/sessions\/([^/]+)$/);
 
+  // Recall.ai real-time streaming endpoint
+  if (url.pathname === "/ws/recall") {
+    recallWss.handleUpgrade(req, socket, head, (ws) => {
+      recallWss.emit("connection", ws);
+    });
+    return;
+  }
+
+  // Avatar webpage endpoint
+  const match = url.pathname.match(/^\/ws\/sessions\/([^/]+)$/);
   if (!match) {
     socket.destroy();
     return;
