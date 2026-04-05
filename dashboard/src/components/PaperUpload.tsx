@@ -1,9 +1,27 @@
 import { useState, useCallback, useRef } from 'react';
 import type { DashboardState, DashboardAction } from '../types';
+import * as api from '../api/client';
 
 interface PaperUploadProps {
   paper: DashboardState['paper'];
   dispatch: React.Dispatch<DashboardAction>;
+}
+
+/**
+ * Read a File as a base64 string (without the data URL prefix).
+ */
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // Strip the "data:...;base64," prefix
+      const base64 = result.split(',')[1] ?? '';
+      resolve(base64);
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
 }
 
 export function PaperUpload({ paper, dispatch }: PaperUploadProps) {
@@ -12,13 +30,37 @@ export function PaperUpload({ paper, dispatch }: PaperUploadProps) {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = useCallback((file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      dispatch({ type: 'PAPER_TEXT_SET', text, fileName: file.name });
-    };
-    reader.readAsText(file);
+  const handleFileSelect = useCallback(async (file: File) => {
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+    const isBinary = ext === 'pdf' || ext === 'docx';
+
+    if (isBinary) {
+      // Use server-side extraction for PDF/DOCX (handles binary parsing + comments)
+      dispatch({ type: 'PAPER_EXTRACT_START' });
+      try {
+        const base64 = await readFileAsBase64(file);
+        const result = await api.extractPaper(base64, file.name);
+        dispatch({
+          type: 'PAPER_EXTRACTED',
+          text: result.text,
+          fileName: file.name,
+          comments: result.comments,
+        });
+      } catch (err) {
+        dispatch({
+          type: 'PAPER_EXTRACT_ERROR',
+          error: (err as Error).message,
+        });
+      }
+    } else {
+      // Plain text files can be read directly in the browser
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result as string;
+        dispatch({ type: 'PAPER_TEXT_SET', text, fileName: file.name, comments: [] });
+      };
+      reader.readAsText(file);
+    }
   }, [dispatch]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -35,10 +77,21 @@ export function PaperUpload({ paper, dispatch }: PaperUploadProps) {
 
   const handlePaste = useCallback(() => {
     if (pasteText.trim()) {
-      dispatch({ type: 'PAPER_TEXT_SET', text: pasteText, fileName: 'Pasted text' });
+      dispatch({ type: 'PAPER_TEXT_SET', text: pasteText, fileName: 'Pasted text', comments: [] });
       setShowPasteArea(false);
     }
   }, [pasteText, dispatch]);
+
+  if (paper.isExtracting) {
+    return (
+      <div className="paper-preview">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="spinner spinner-sm" />
+          <span>Extracting text from file...</span>
+        </div>
+      </div>
+    );
+  }
 
   if (paper.text) {
     return (
@@ -50,6 +103,11 @@ export function PaperUpload({ paper, dispatch }: PaperUploadProps) {
             {paper.text.length.toLocaleString()} chars
           </span>
         </div>
+        {paper.comments.length > 0 && (
+          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4 }}>
+            💬 {paper.comments.length} comment{paper.comments.length !== 1 ? 's' : ''} extracted
+          </div>
+        )}
         <button
           className="btn btn-secondary btn-sm"
           onClick={() => dispatch({ type: 'PAPER_CLEARED' })}

@@ -1,4 +1,9 @@
 import { Router, type Request, type Response } from "express";
+import { execSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Config } from "../config.js";
 import {
   DEFAULT_SYSTEM_PROMPT,
@@ -6,6 +11,43 @@ import {
 } from "../config.js";
 import type { SessionManager } from "../services/session-manager.js";
 import type { LLMService } from "../services/llm.js";
+import {
+  extractTextFromBuffer,
+} from "../services/paper-reader.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+interface ExtractedComment {
+  id: string;
+  author: string;
+  date: string;
+  comment: string;
+  anchored_text: string;
+}
+
+/**
+ * Extract DOCX comments by shelling out to the Python script.
+ */
+function extractDocxComments(filePath: string): ExtractedComment[] {
+  try {
+    const scriptPath = path.resolve(
+      __dirname,
+      "../utils/extract_comments.py",
+    );
+    const output = execSync(
+      `python3 "${scriptPath}" --json "${filePath}"`,
+      { encoding: "utf-8", timeout: 15000 },
+    );
+    return JSON.parse(output.trim()) as ExtractedComment[];
+  } catch (err) {
+    console.warn(
+      "[Dashboard] DOCX comment extraction failed:",
+      (err as Error).message,
+    );
+    return [];
+  }
+}
 
 export function createDashboardRouter(
   config: Config,
@@ -13,6 +55,75 @@ export function createDashboardRouter(
   llm: LLMService,
 ): Router {
   const router = Router();
+
+  // ── POST /api/papers/extract ──────────────────
+  // Extract text + comments from a file (base64-encoded body)
+
+  router.post("/papers/extract", async (req: Request, res: Response) => {
+    try {
+      const { data, fileName } = req.body as {
+        data?: string; // base64-encoded file content
+        fileName?: string;
+      };
+
+      if (!data || !fileName) {
+        res
+          .status(400)
+          .json({ error: "data (base64) and fileName are required" });
+        return;
+      }
+
+      const ext = path.extname(fileName).toLowerCase();
+      if (![".pdf", ".docx", ".txt"].includes(ext)) {
+        res
+          .status(400)
+          .json({ error: `Unsupported file type: ${ext}. Supported: .pdf, .docx, .txt` });
+        return;
+      }
+
+      console.log(
+        `[Dashboard] Extracting text from ${fileName} (${ext})...`,
+      );
+
+      // Decode base64 to buffer
+      const buffer = Buffer.from(data, "base64");
+
+      // Extract text using the paper-reader service
+      const text = await extractTextFromBuffer(buffer, ext);
+
+      // Extract DOCX comments if applicable
+      let comments: ExtractedComment[] = [];
+      if (ext === ".docx") {
+        // Write to temp file for Python script
+        const tmpDir = os.tmpdir();
+        const tmpFile = path.join(tmpDir, `kira_extract_${Date.now()}${ext}`);
+        fs.writeFileSync(tmpFile, buffer);
+        try {
+          comments = extractDocxComments(tmpFile);
+        } finally {
+          try {
+            fs.unlinkSync(tmpFile);
+          } catch {
+            // cleanup best-effort
+          }
+        }
+      }
+
+      console.log(
+        `[Dashboard] Extracted ${text.length} chars, ${comments.length} comments from ${fileName}`,
+      );
+
+      res.json({ text, comments });
+    } catch (err) {
+      console.error(
+        "[Dashboard] File extraction error:",
+        (err as Error).message,
+      );
+      res.status(500).json({
+        error: `File extraction failed: ${(err as Error).message}`,
+      });
+    }
+  });
 
   // ── POST /api/papers/analyze ──────────────────
   // Analyze paper text without creating a session

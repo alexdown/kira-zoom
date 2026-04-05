@@ -75,5 +75,126 @@ export function createHeygenRouter(config: Config): Router {
     }
   });
 
+  /**
+   * GET /api/heygen/context
+   * Fetch the current LiveAvatar context (prompt, opening_text, etc.)
+   */
+  router.get("/context", async (_req: Request, res: Response) => {
+    try {
+      const { heygenApiKey, heygenContextId } = config;
+
+      if (!heygenApiKey) {
+        res.status(500).json({ error: "HEYGEN_API_KEY not configured" });
+        return;
+      }
+      if (!heygenContextId) {
+        res.status(500).json({ error: "HEYGEN_CONTEXT_ID not configured" });
+        return;
+      }
+
+      console.log(`[HeyGen] Fetching context ${heygenContextId}...`);
+
+      const response = await fetch(
+        `https://api.liveavatar.com/v1/contexts/${heygenContextId}`,
+        {
+          method: "GET",
+          headers: { "X-API-KEY": heygenApiKey },
+        },
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(
+          `[HeyGen] Context fetch error (${response.status}): ${errorText}`,
+        );
+        res
+          .status(response.status)
+          .json({ error: `HeyGen API error: ${errorText}` });
+        return;
+      }
+
+      const data = await response.json();
+      console.log(`[HeyGen] Context fetched successfully`);
+      res.json(data);
+    } catch (err) {
+      console.error("[HeyGen] Failed to fetch context:", err);
+      res.status(500).json({
+        error:
+          err instanceof Error ? err.message : "Failed to fetch HeyGen context",
+      });
+    }
+  });
+
+  /**
+   * PATCH /api/heygen/context
+   * Update the LiveAvatar context (name, prompt, opening_text — all required).
+   */
+  router.patch("/context", async (req: Request, res: Response) => {
+    try {
+      const { heygenApiKey, heygenContextId } = config;
+
+      if (!heygenApiKey) {
+        res.status(500).json({ error: "HEYGEN_API_KEY not configured" });
+        return;
+      }
+      if (!heygenContextId) {
+        res.status(500).json({ error: "HEYGEN_CONTEXT_ID not configured" });
+        return;
+      }
+
+      const { name, prompt, opening_text } = req.body as {
+        name?: string;
+        prompt?: string;
+        opening_text?: string;
+      };
+
+      if (!name || !prompt || !opening_text) {
+        res.status(400).json({
+          error: "name, prompt, and opening_text are all required",
+        });
+        return;
+      }
+
+      console.log(
+        `[HeyGen] Updating context ${heygenContextId} (prompt: ${prompt.length} chars)...`,
+      );
+
+      const response = await fetch(
+        `https://api.liveavatar.com/v1/contexts/${heygenContextId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "X-API-KEY": heygenApiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ name, prompt, opening_text }),
+        },
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(
+          `[HeyGen] Context update error (${response.status}): ${errorText}`,
+        );
+        res
+          .status(response.status)
+          .json({ error: `HeyGen API error: ${errorText}` });
+        return;
+      }
+
+      const data = await response.json();
+      console.log(`[HeyGen] Context updated successfully`);
+      res.json(data);
+    } catch (err) {
+      console.error("[HeyGen] Failed to update context:", err);
+      res.status(500).json({
+        error:
+          err instanceof Error
+            ? err.message
+            : "Failed to update HeyGen context",
+      });
+    }
+  });
+
   return router;
 }

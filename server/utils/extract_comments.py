@@ -108,10 +108,18 @@ def format_comments_for_context(comments: list[DocxComment]) -> str:
 
 if __name__ == '__main__':
     import sys
+    import json as json_mod
     
     if len(sys.argv) < 2:
-        print("Usage: python extract_comments.py <file.docx>")
+        print("Usage: python extract_comments.py [--json] <file.docx>")
         sys.exit(1)
     
-    comments = extract_docx_comments(sys.argv[1])
-    print(format_comments_for_context(comments))
+    use_json = '--json' in sys.argv
+    filepath = [a for a in sys.argv[1:] if a != '--json'][0]
+    
+    comments = extract_docx_comments(filepath)
+    
+    if use_json:
+        print(json_mod.dumps(comments))
+    else:
+        print(format_comments_for_context(comments))

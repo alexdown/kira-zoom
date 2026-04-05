@@ -1,10 +1,54 @@
 import { Router, type Request, type Response } from "express";
 import type { Config } from "../config.js";
+import { DEFAULT_SYSTEM_PROMPT } from "../config.js";
 import type { SessionManager } from "../services/session-manager.js";
 import type { RecallService } from "../services/recall.js";
 import type { LLMService } from "../services/llm.js";
 import { SessionState } from "../types.js";
 import type { CreateSessionRequest } from "../types.js";
+
+/**
+ * Build the combined HeyGen context prompt from session data.
+ */
+function buildHeygenContextPrompt(
+  basePrompt: string,
+  paper?: { summary: string; rawText?: string },
+  comments?: Array<{ author: string; comment: string; anchored_text: string }>,
+  questions?: Array<{ text: string; rationale: string }>,
+): string {
+  const parts: string[] = [basePrompt];
+
+  if (paper?.summary) {
+    parts.push(`DOCUMENT SUMMARY:\n${paper.summary}`);
+  }
+
+  if (comments && comments.length > 0) {
+    const commentLines = comments.map((c) => {
+      const anchor = c.anchored_text
+        ? ` on "${c.anchored_text.slice(0, 80)}"`
+        : "";
+      return `- [${c.author}]${anchor}: "${c.comment}"`;
+    });
+    parts.push(
+      `DOCUMENT COMMENTS (${comments.length} comments from reviewers):\n${commentLines.join("\n")}`,
+    );
+  }
+
+  if (questions && questions.length > 0) {
+    const qLines = questions.map(
+      (q, i) => `${i + 1}. ${q.text} — Rationale: ${q.rationale}`,
+    );
+    parts.push(
+      `YOUR PREPARED QUESTIONS (ask when appropriate, but adapt based on conversation):\n${qLines.join("\n")}`,
+    );
+  }
+
+  parts.push(
+    "BEHAVIOR: Listen actively. When someone answers, engage with follow-ups based on what they said. Don't just read scripted questions. Be conversational and genuinely curious.",
+  );
+
+  return parts.join("\n\n");
+}
 
 export function createSessionsRouter(
   config: Config,
@@ -69,14 +113,77 @@ export function createSessionsRouter(
         }
       }
 
-      // 3. Create bot via Recall.ai and join the meeting
-      try {
-        const state = session.state === SessionState.PREPARING
-          ? session.state
-          : SessionState.IDLE;
-        if (state !== SessionState.PREPARING) {
-          // If we didn't prepare (no paper), go straight to JOINING
+      // If pre-analyzed questions were provided, use them
+      if (body.questions && body.questions.length > 0 && session.questions.length === 0) {
+        session.questions = body.questions;
+        console.log(
+          `[Session] ${session.id}: using ${body.questions.length} pre-analyzed questions`,
+        );
+      }
+
+      // If paper summary was provided, use it
+      if (body.paperSummary && !session.paper) {
+        session.paper = {
+          summary: body.paperSummary,
+          rawText: body.paperText ?? "",
+        };
+      }
+
+      // 3. Update HeyGen context with combined prompt (before bot creation)
+      if (config.heygenApiKey && config.heygenContextId) {
+        try {
+          const basePrompt =
+            sessionConfig.systemPrompt || config.defaultSystemPrompt || DEFAULT_SYSTEM_PROMPT;
+
+          const contextPrompt = buildHeygenContextPrompt(
+            basePrompt,
+            session.paper,
+            body.comments,
+            session.questions,
+          );
+
+          console.log(
+            `[Session] ${session.id}: updating HeyGen context (${contextPrompt.length} chars)...`,
+          );
+
+          const heygenRes = await fetch(
+            `https://api.liveavatar.com/v1/contexts/${config.heygenContextId}`,
+            {
+              method: "PATCH",
+              headers: {
+                "X-API-KEY": config.heygenApiKey,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                name: "Kira Meeting Context",
+                prompt: contextPrompt,
+                opening_text:
+                  "Hi, I'm Kira, your Amazonian AI. I've reviewed the paper and I'm ready to discuss it.",
+              }),
+            },
+          );
+
+          if (!heygenRes.ok) {
+            const errText = await heygenRes.text();
+            console.error(
+              `[Session] ${session.id}: HeyGen context update failed (${heygenRes.status}): ${errText}`,
+            );
+          } else {
+            console.log(
+              `[Session] ${session.id}: HeyGen context updated successfully`,
+            );
+          }
+        } catch (err) {
+          console.error(
+            `[Session] ${session.id}: HeyGen context update error:`,
+            (err as Error).message,
+          );
+          // Non-fatal — continue with bot creation
         }
+      }
+
+      // 4. Create bot via Recall.ai and join the meeting
+      try {
         sessionManager.updateState(session.id, SessionState.JOINING);
 
         const avatarUrl = `${config.avatarPublicUrl}?sessionId=${session.id}`;

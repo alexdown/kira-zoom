@@ -5,6 +5,7 @@ import type {
   Session,
   BotStatus,
   HeygenStatus,
+  ExtractedComment,
 } from './types';
 import { Header } from './components/Header';
 import { LeftPanel } from './components/LeftPanel';
@@ -21,6 +22,8 @@ const initialState: DashboardState = {
     fileName: null,
     text: null,
     summary: null,
+    comments: [],
+    isExtracting: false,
     isAnalyzing: false,
   },
   questions: [],
@@ -93,7 +96,36 @@ function dashboardReducer(state: DashboardState, action: DashboardAction): Dashb
     case 'PAPER_TEXT_SET':
       return {
         ...state,
-        paper: { ...state.paper, text: action.text, fileName: action.fileName ?? null },
+        paper: {
+          ...state.paper,
+          text: action.text,
+          fileName: action.fileName ?? null,
+          comments: action.comments ?? state.paper.comments,
+        },
+      };
+    case 'PAPER_EXTRACT_START':
+      return { ...state, paper: { ...state.paper, isExtracting: true } };
+    case 'PAPER_EXTRACTED':
+      return {
+        ...state,
+        paper: {
+          ...state.paper,
+          isExtracting: false,
+          text: action.text,
+          fileName: action.fileName,
+          comments: action.comments,
+        },
+      };
+    case 'PAPER_EXTRACT_ERROR':
+      return {
+        ...state,
+        paper: { ...state.paper, isExtracting: false },
+        errors: [...state.errors, {
+          id: crypto.randomUUID(),
+          message: action.error,
+          timestamp: Date.now(),
+          dismissed: false,
+        }],
       };
     case 'PAPER_ANALYZE_START':
       return { ...state, paper: { ...state.paper, isAnalyzing: true } };
@@ -117,7 +149,7 @@ function dashboardReducer(state: DashboardState, action: DashboardAction): Dashb
     case 'PAPER_CLEARED':
       return {
         ...state,
-        paper: { fileName: null, text: null, summary: null, isAnalyzing: false },
+        paper: { fileName: null, text: null, summary: null, comments: [], isExtracting: false, isAnalyzing: false },
         questions: [],
       };
 
@@ -341,6 +373,15 @@ export default function App() {
         meetingUrl: state.meeting.zoomUrl,
         botName: state.meeting.botName,
         paperText: state.paper.text ?? undefined,
+        paperSummary: state.paper.summary ?? undefined,
+        questions: state.questions.length > 0 ? state.questions : undefined,
+        comments: state.paper.comments.length > 0
+          ? state.paper.comments.map((c) => ({
+              author: c.author,
+              comment: c.comment,
+              anchored_text: c.anchored_text,
+            }))
+          : undefined,
         config: {
           ttsVoice: state.settings.ttsVoice,
           maxQuestions: state.settings.maxQuestions,
@@ -352,7 +393,7 @@ export default function App() {
     } catch (err) {
       dispatch({ type: 'JOIN_ERROR', error: (err as Error).message });
     }
-  }, [state.meeting, state.paper.text, state.settings]);
+  }, [state.meeting, state.paper, state.questions, state.settings]);
 
   const handleLeave = useCallback(async () => {
     if (!state.session) return;
