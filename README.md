@@ -78,7 +78,8 @@ The startup script automatically:
 - [ ] **Dynamic context injection** — feed paper content to avatar mid-session via `session.message()` ([#1](https://github.com/alexdown/AIS-test/issues/1))
 - [ ] **Detect when Kira is addressed** — ensure she responds to direct questions by name ([#2](https://github.com/alexdown/AIS-test/issues/2))
 - [ ] **DOCX comments in dashboard** — extract inline comments on upload, display in UI, auto-include in avatar context ([#3](https://github.com/alexdown/AIS-test/issues/3))
-- [ ] **Mute/unmute and video controls** — toggle Kira's mic and avatar on/off during a live call ([#4](https://github.com/alexdown/AIS-test/issues/4))
+- [ ] **Mute/unmute and camera on/off controls** — toggle Kira's mic and avatar on/off during a live call ([#4](https://github.com/alexdown/AIS-test/issues/4))
+- [ ] **Custom avatar background** — replace HeyGen green screen with configurable background via WebGL chroma key ([#5](https://github.com/alexdown/AIS-test/issues/5))
 
 ## CLI Commands
 
