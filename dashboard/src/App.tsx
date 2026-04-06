@@ -517,7 +517,7 @@ export default function App() {
 
       // Send ONLY to HeyGen avatar (not ElevenLabs/output_audio which produces a different voice)
       try {
-        await api.avatarSpeak(textToSpeak);
+        await api.avatarSpeak(textToSpeak, 'exact');
       } catch {
         // Fallback: try the session speak endpoint (uses ElevenLabs)
         await api.speak(state.session.id, payload);
