@@ -52,7 +52,7 @@ export function RightPanel({
   return (
     <div className="right-panel">
       {/* Transcript */}
-      <div className="panel transcript-panel">
+      <div className="panel transcript-panel transcript-section">
         <div className="transcript-header">
           <h2 className="section-title">
             <span className="section-icon">📡</span>

@@ -978,3 +978,22 @@ a:hover {
 .empty-state-text {
   font-size: 13px;
 }
+
+/* ── Resizable Panels ── */
+.left-panel {
+  resize: horizontal;
+  min-width: 280px;
+  max-width: 60%;
+}
+
+.transcript-section {
+  resize: vertical;
+  min-height: 60px;
+  overflow-y: auto;
+}
+
+.status-section {
+  resize: vertical;
+  min-height: 80px;
+  overflow: auto;
+}
