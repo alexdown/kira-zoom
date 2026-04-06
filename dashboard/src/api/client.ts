@@ -209,3 +209,9 @@ export function getConfigDefaults() {
     personality: { name: string; style: string; introPhrase: string };
   }>('GET', '/api/config/defaults');
 }
+
+// ── Context Injection ──
+
+export function injectContext(sessionId: string, text: string, label?: string) {
+  return request<{ status: string; text: string }>('POST', `/api/sessions/${sessionId}/inject-context`, { text, label });
+}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { DashboardState, DashboardAction, Question } from '../types';
+import type { DashboardState, DashboardAction, Question, ContextInjection } from '../types';
 import { PaperUpload } from './PaperUpload';
 import { QuestionList } from './QuestionList';
 import { ContextEditor } from './ContextEditor';
@@ -10,6 +10,8 @@ interface LeftPanelProps {
   selectedQuestionId: string | null;
   settings: DashboardState['settings'];
   isAnalyzing: boolean;
+  isInCall: boolean;
+  contextInjections: ContextInjection[];
   dispatch: React.Dispatch<DashboardAction>;
   onAnalyze: () => void;
 }
@@ -20,6 +22,8 @@ export function LeftPanel({
   selectedQuestionId,
   settings,
   isAnalyzing,
+  isInCall,
+  contextInjections,
   dispatch,
   onAnalyze,
 }: LeftPanelProps) {
@@ -147,11 +151,13 @@ export function LeftPanel({
         <div className="section-header">
           <h2 className="section-title">
             <span className="section-icon">💬</span>
-            Context
+            {isInCall ? 'Avatar Context View' : 'Context'}
           </h2>
         </div>
         <ContextEditor
           systemPrompt={settings.systemPrompt}
+          isInCall={isInCall}
+          contextInjections={contextInjections}
           dispatch={dispatch}
         />
       </div>

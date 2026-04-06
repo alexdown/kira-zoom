@@ -4,11 +4,13 @@ import type {
   DashboardState,
   DashboardAction,
   Question,
+  ContextInjection,
 } from '../types';
 import { TranscriptFeed } from './TranscriptFeed';
 import { StatusPanel } from './StatusPanel';
 import { MeetingControls } from './MeetingControls';
 import { SpeakDialog } from './SpeakDialog';
+import { ContextInjector } from './ContextInjector';
 
 interface RightPanelProps {
   transcript: TranscriptSegment[];
@@ -19,6 +21,8 @@ interface RightPanelProps {
   controls: DashboardState['controls'];
   questions: Question[];
   selectedQuestionId: string | null;
+  paper: DashboardState['paper'];
+  contextInjections: ContextInjection[];
   dispatch: React.Dispatch<DashboardAction>;
   onJoin: () => void;
   onLeave: () => void;
@@ -37,6 +41,8 @@ export function RightPanel({
   controls,
   questions,
   selectedQuestionId,
+  paper,
+  contextInjections,
   dispatch,
   onJoin,
   onLeave,
@@ -140,6 +146,23 @@ export function RightPanel({
               isSpeaking={controls.isSpeaking}
               dispatch={dispatch}
               onSpeak={onSpeak}
+            />
+          </div>
+        )}
+
+        {/* Send Context — visible during a call */}
+        {isInCall && session && (
+          <div style={{ marginTop: 12, borderTop: '1px solid var(--border-muted)', paddingTop: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>
+              🧠 Send Context
+            </div>
+            <ContextInjector
+              sessionId={session.id}
+              injectText={controls.injectText}
+              isInjecting={controls.isInjecting}
+              paper={paper}
+              contextInjections={contextInjections}
+              dispatch={dispatch}
             />
           </div>
         )}
