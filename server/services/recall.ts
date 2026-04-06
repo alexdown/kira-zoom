@@ -9,10 +9,14 @@ import type { Config } from "../config.js";
 export class RecallService {
   private baseUrl: string;
   private apiKey: string;
+  private webhookBaseUrl: string;
+  private avatarPublicUrl: string;
 
   constructor(config: Config) {
     this.baseUrl = config.recallBaseUrl;
     this.apiKey = config.recallApiKey;
+    this.webhookBaseUrl = config.webhookBaseUrl;
+    this.avatarPublicUrl = config.avatarPublicUrl;
   }
 
   // ── helpers ───────────────────────────────────
@@ -49,7 +53,6 @@ export class RecallService {
         );
       }
 
-      // Some endpoints return empty body on success (e.g. DELETE)
       if (!text) return undefined as T;
       return JSON.parse(text) as T;
     } catch (err) {
@@ -66,26 +69,42 @@ export class RecallService {
 
   /**
    * Create a bot and have it join a meeting.
+   * Uses the correct recording_config format (not the deprecated transcription_options).
    */
   async createBot(
     meetingUrl: string,
     botName: string,
     avatarUrl?: string,
-    webhookUrl?: string,
+    _webhookUrl?: string,
   ): Promise<Record<string, unknown>> {
     const payload: Record<string, unknown> = {
       meeting_url: meetingUrl,
       bot_name: botName,
-      transcription_options: {
-        provider: "meeting_captions",
+      recording_config: {
+        transcript: {
+          provider: {
+            recallai_streaming: {
+              language_code: "en",
+            },
+          },
+        },
+        include_bot_in_recording: {
+          audio: true,
+        },
+        realtime_endpoints: [
+          {
+            type: "websocket",
+            url: `wss://${new URL(this.webhookBaseUrl).host}/ws/recall`,
+            events: ["transcript.data", "transcript.partial_data"],
+          },
+        ],
+      },
+      variant: {
+        zoom: "web_4_core",
+        google_meet: "web_4_core",
+        microsoft_teams: "web_4_core",
       },
     };
-
-    if (webhookUrl) {
-      payload.real_time_transcription = {
-        destination_url: `${webhookUrl}/api/webhooks/recall`,
-      };
-    }
 
     if (avatarUrl) {
       payload.output_media = {
@@ -96,7 +115,7 @@ export class RecallService {
       };
     }
 
-    return this.request<Record<string, unknown>>("POST", "/bot", payload);
+    return this.request<Record<string, unknown>>("POST", "/bot/", payload);
   }
 
   /**
@@ -110,30 +129,29 @@ export class RecallService {
    * Send a chat message in the meeting.
    */
   async sendChatMessage(botId: string, message: string): Promise<void> {
-    await this.request("POST", `/bot/${botId}/send_chat_message`, { message });
+    await this.request("POST", `/bot/${botId}/send_chat_message/`, { message });
   }
 
   /**
    * Send audio to the meeting so the bot "speaks".
-   * @param audioBase64 Base64-encoded audio data
-   * @param kind Audio format (default: "mp3")
    */
   async outputAudio(
     botId: string,
     audioBase64: string,
     kind: string = "mp3",
   ): Promise<void> {
-    await this.request("POST", `/bot/${botId}/output_audio`, {
-      data: audioBase64,
+    await this.request("POST", `/bot/${botId}/output_audio/`, {
       kind,
+      b64_data: audioBase64,
     });
   }
 
   /**
    * Remove the bot from the meeting.
+   * Note: endpoint is /leave_call/ not DELETE /bot/
    */
   async leaveMeeting(botId: string): Promise<void> {
-    await this.request("DELETE", `/bot/${botId}`);
+    await this.request("POST", `/bot/${botId}/leave_call/`, {});
   }
 
   /**
@@ -143,12 +161,10 @@ export class RecallService {
     botId: string,
     webpageUrl: string,
   ): Promise<void> {
-    await this.request("PATCH", `/bot/${botId}`, {
-      output_media: {
-        camera: {
-          kind: "webpage",
-          config: { url: webpageUrl },
-        },
+    await this.request("POST", `/bot/${botId}/output_media/`, {
+      camera: {
+        kind: "webpage",
+        config: { url: webpageUrl },
       },
     });
   }
