@@ -25,17 +25,18 @@ const STATUS_TEXT: Record<BotState, string> = {
   ERROR: "Error",
 };
 
-function getParams(): { sessionId: string; avatar: string; botName: string } {
+function getParams(): { sessionId: string; avatar: string; botName: string; bgImage: string } {
   const params = new URLSearchParams(window.location.search);
   return {
     sessionId: params.get("sessionId") ?? "",
     avatar: params.get("avatar") ?? "",
     botName: params.get("botName") ?? "Kira (AI Principal SA)",
+    bgImage: params.get("bgImage") ?? "",
   };
 }
 
 export default function App() {
-  const { sessionId, avatar, botName } = useMemo(getParams, []);
+  const { sessionId, avatar, botName, bgImage } = useMemo(getParams, []);
   const { state, connected } = useServerWS(sessionId);
   const [heygenFailed, setHeygenFailed] = useState(false);
   const [handRaised, setHandRaised] = useState(false);
@@ -133,7 +134,9 @@ export default function App() {
         style={{
           position: "fixed",
           inset: 0,
-          background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)",
+          background: bgImage
+            ? `url(${bgImage}) center/cover no-repeat`
+            : "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)",
           overflow: "hidden",
         }}
       >
