@@ -31,7 +31,7 @@ function getParams(): { sessionId: string; avatar: string; botName: string; bgIm
     sessionId: params.get("sessionId") ?? "",
     avatar: params.get("avatar") ?? "",
     botName: params.get("botName") ?? "Kira (AI Principal SA)",
-    bgImage: params.get("bgImage") ?? "",
+    bgImage: params.get("bgImage") ?? "/bg-aws-office.jpg",
   };
 }
 
