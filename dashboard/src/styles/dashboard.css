@@ -10,7 +10,6 @@
 html, body, #root {
   height: 100%;
   width: 100%;
-  overflow: hidden;
 }
 
 body {
@@ -121,7 +120,7 @@ a:hover {
 .app-layout {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  min-height: 100vh;
   min-width: 1024px;
 }
 
@@ -228,7 +227,7 @@ a:hover {
 .right-panel {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
   background: var(--bg-base);
   padding: var(--panel-padding);
   gap: var(--panel-gap);
