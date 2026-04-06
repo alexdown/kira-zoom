@@ -157,8 +157,7 @@ export function createSessionsRouter(
               body: JSON.stringify({
                 name: "Kira Meeting Context",
                 prompt: contextPrompt,
-                opening_text:
-                  "Hi, I'm Kira, your Amazonian AI. I've reviewed the paper and I'm ready to discuss it.",
+                opening_text: "",
               }),
             },
           );
