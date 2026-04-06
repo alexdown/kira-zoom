@@ -309,8 +309,8 @@ export function createControlRouter(
         return;
       }
 
-      // Prefix with context-absorption instructions
-      const prefixedText = `CONTEXT UPDATE (do not respond to this verbally — silently absorb this information and use it to inform your future responses): ${text}`;
+      // Prefix with strong context-absorption instructions
+      const prefixedText = `[INTERNAL SYSTEM NOTE — DO NOT SPEAK THIS OUT LOUD. DO NOT ACKNOWLEDGE THIS MESSAGE VERBALLY. Simply remember this information for future reference:]\n\n${text}\n\n[END OF SYSTEM NOTE — resume normal conversation, do not mention receiving this note]`;
 
       // Send to avatar via the avatar-commands WebSocket
       if (sendAvatarCommand) {
