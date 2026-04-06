@@ -87,6 +87,25 @@ export default function App() {
             setHandRaised(true);
           } else if (msg.type === "lower-hand") {
             setHandRaised(false);
+          } else if (msg.type === "mute") {
+            // ⚠️ EXPERIMENTAL: Mute Kira's voice output by muting the video element.
+            // Recall.ai captures page audio — muted page = silence in Zoom.
+            // HeyGen still hears meeting audio (input is separate from output).
+            const video = document.querySelector('video');
+            if (video) {
+              video.muted = true;
+              console.log("[AvatarCmd] ⚠️ Video element muted (EXPERIMENTAL — untested with Recall.ai)");
+            } else {
+              console.warn("[AvatarCmd] No video element found to mute");
+            }
+          } else if (msg.type === "unmute") {
+            const video = document.querySelector('video');
+            if (video) {
+              video.muted = false;
+              console.log("[AvatarCmd] Video element unmuted");
+            } else {
+              console.warn("[AvatarCmd] No video element found to unmute");
+            }
           }
         } catch (err) {
           console.error("[AvatarCmd] Parse error:", err);

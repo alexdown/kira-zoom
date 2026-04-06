@@ -30,6 +30,8 @@ interface RightPanelProps {
   onLowerHand: () => void;
   onSpeak: () => void;
   onDownloadTranscript: () => void;
+  onMuteToggle: () => void;
+  onCameraToggle: () => void;
 }
 
 export function RightPanel({
@@ -50,6 +52,8 @@ export function RightPanel({
   onLowerHand,
   onSpeak,
   onDownloadTranscript,
+  onMuteToggle,
+  onCameraToggle,
 }: RightPanelProps) {
   const sessionState = session?.state ?? null;
   const isInCall = sessionState === 'JOINING' || sessionState === 'LISTENING' || sessionState === 'HAND_RAISED' || sessionState === 'SPEAKING';
@@ -136,6 +140,23 @@ export function RightPanel({
               >
                 {controls.isLoweringHand ? <span className="spinner spinner-sm" /> : '🤚'}
                 Lower Hand
+              </button>
+            </div>
+
+            <div className="button-row" style={{ marginTop: 8 }}>
+              <button
+                className={`btn ${controls.isMuted ? 'btn-warning' : 'btn-secondary'}`}
+                onClick={onMuteToggle}
+                title="⚠️ Experimental: mutes page audio for Recall.ai"
+              >
+                {controls.isMuted ? '🔇 Unmute' : '🎤 Mute'}
+              </button>
+              <button
+                className={`btn ${controls.isCameraOff ? 'btn-warning' : 'btn-secondary'}`}
+                onClick={onCameraToggle}
+                title="⚠️ Experimental: toggles Recall.ai output_media — may kill HeyGen session"
+              >
+                {controls.isCameraOff ? '📷 Camera On' : '📹 Camera Off'}
               </button>
             </div>
 

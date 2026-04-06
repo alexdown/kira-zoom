@@ -168,4 +168,41 @@ export class RecallService {
       },
     });
   }
+
+  /**
+   * Stop the bot's output media (camera off).
+   * ⚠️ EXPERIMENTAL: This may kill the HeyGen session. Needs testing.
+   * Uses DELETE /bot/{id}/output_media/ with body { "camera": true }
+   */
+  async stopOutputMedia(botId: string): Promise<void> {
+    console.warn("[Recall] ⚠️ stopOutputMedia is EXPERIMENTAL — may kill HeyGen session");
+    // DELETE with a body requires manual fetch since our helper doesn't distinguish
+    const url = `${this.baseUrl}/bot/${botId}/output_media/`;
+    const res = await fetch(url, {
+      method: "DELETE",
+      headers: this.headers(),
+      body: JSON.stringify({ camera: true }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(
+        `Recall API DELETE /bot/${botId}/output_media/ failed (${res.status}): ${text}`,
+      );
+    }
+  }
+
+  /**
+   * Start/restore the bot's output media (camera on).
+   * ⚠️ EXPERIMENTAL: Re-enabling output_media after stopping it is untested.
+   * Uses POST /bot/{id}/output_media/ with the avatar webpage config.
+   */
+  async startOutputMedia(botId: string, webpageUrl: string): Promise<void> {
+    console.warn("[Recall] ⚠️ startOutputMedia is EXPERIMENTAL — re-enabling output_media after stop is untested");
+    await this.request("POST", `/bot/${botId}/output_media/`, {
+      camera: {
+        kind: "webpage",
+        config: { url: webpageUrl },
+      },
+    });
+  }
 }

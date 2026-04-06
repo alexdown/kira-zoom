@@ -127,6 +127,8 @@ export interface DashboardState {
     customSpeakText: string;
     isInjecting: boolean;
     injectText: string;
+    isMuted: boolean;
+    isCameraOff: boolean;
   };
 
   // Context injections log
@@ -224,7 +226,9 @@ export type DashboardAction =
   | { type: 'INJECT_TEXT_CHANGED'; text: string }
   | { type: 'INJECT_CONTEXT_START' }
   | { type: 'INJECT_CONTEXT_SUCCESS'; injection: ContextInjection }
-  | { type: 'INJECT_CONTEXT_ERROR'; error: string };
+  | { type: 'INJECT_CONTEXT_ERROR'; error: string }
+  | { type: 'MUTE_TOGGLED'; muted: boolean }
+  | { type: 'CAMERA_TOGGLED'; cameraOff: boolean };
 
 // ── API Response Types ──
 

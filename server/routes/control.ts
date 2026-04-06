@@ -297,6 +297,57 @@ export function createControlRouter(
     }
   });
 
+  // ── POST /:id/camera-off ───────────────────────
+  // ⚠️ EXPERIMENTAL: We don't know if stopping output_media kills the HeyGen session.
+
+  router.post("/:id/camera-off", async (req: Request, res: Response) => {
+    try {
+      const session = getSessionWithBot(req.params.id as string);
+
+      console.warn(`[Control] ${session.id}: ⚠️ camera-off is EXPERIMENTAL — may kill HeyGen session`);
+
+      await recall.stopOutputMedia(session.botId!);
+
+      console.log(`[Control] ${session.id}: camera turned off (output_media deleted)`);
+
+      res.json({ status: "camera_off", message: "Camera turned off (experimental)" });
+    } catch (err) {
+      const statusCode = (err as { statusCode?: number }).statusCode ?? 500;
+      const msg = (err as Error).message;
+      if (msg.includes("not found")) {
+        res.status(404).json({ error: msg });
+      } else {
+        res.status(statusCode).json({ error: msg });
+      }
+    }
+  });
+
+  // ── POST /:id/camera-on ────────────────────────
+  // ⚠️ EXPERIMENTAL: Re-enabling output_media after DELETE is untested.
+
+  router.post("/:id/camera-on", async (req: Request, res: Response) => {
+    try {
+      const session = getSessionWithBot(req.params.id as string);
+
+      console.warn(`[Control] ${session.id}: ⚠️ camera-on is EXPERIMENTAL — re-enabling output_media after stop is untested`);
+
+      const avatarUrl = `${config.avatarPublicUrl}?sessionId=${session.id}`;
+      await recall.startOutputMedia(session.botId!, avatarUrl);
+
+      console.log(`[Control] ${session.id}: camera turned on (output_media restored)`);
+
+      res.json({ status: "camera_on", message: "Camera turned on (experimental)" });
+    } catch (err) {
+      const statusCode = (err as { statusCode?: number }).statusCode ?? 500;
+      const msg = (err as Error).message;
+      if (msg.includes("not found")) {
+        res.status(404).json({ error: msg });
+      } else {
+        res.status(statusCode).json({ error: msg });
+      }
+    }
+  });
+
   // ── POST /:id/inject-context ──────────────────
 
   router.post("/:id/inject-context", async (req: Request, res: Response) => {

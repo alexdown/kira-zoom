@@ -44,6 +44,8 @@ const initialState: DashboardState = {
     customSpeakText: '',
     isInjecting: false,
     injectText: '',
+    isMuted: false,
+    isCameraOff: false,
   },
   contextInjections: [],
   status: {
@@ -365,6 +367,12 @@ function dashboardReducer(state: DashboardState, action: DashboardAction): Dashb
         }],
       };
 
+    // Mute/Camera
+    case 'MUTE_TOGGLED':
+      return { ...state, controls: { ...state.controls, isMuted: action.muted } };
+    case 'CAMERA_TOGGLED':
+      return { ...state, controls: { ...state.controls, isCameraOff: action.cameraOff } };
+
     default:
       return state;
   }
@@ -582,6 +590,35 @@ export default function App() {
     }
   }, [state.session]);
 
+  const handleMuteToggle = useCallback(async () => {
+    try {
+      if (state.controls.isMuted) {
+        await api.unmuteAvatar();
+        dispatch({ type: 'MUTE_TOGGLED', muted: false });
+      } else {
+        await api.muteAvatar();
+        dispatch({ type: 'MUTE_TOGGLED', muted: true });
+      }
+    } catch (err) {
+      dispatch({ type: 'ERROR_ADDED', message: (err as Error).message });
+    }
+  }, [state.controls.isMuted]);
+
+  const handleCameraToggle = useCallback(async () => {
+    if (!state.session) return;
+    try {
+      if (state.controls.isCameraOff) {
+        await api.cameraOn(state.session.id);
+        dispatch({ type: 'CAMERA_TOGGLED', cameraOff: false });
+      } else {
+        await api.cameraOff(state.session.id);
+        dispatch({ type: 'CAMERA_TOGGLED', cameraOff: true });
+      }
+    } catch (err) {
+      dispatch({ type: 'ERROR_ADDED', message: (err as Error).message });
+    }
+  }, [state.session, state.controls.isCameraOff]);
+
   // Auto-dismiss errors after 8 seconds
   useEffect(() => {
     const active = state.errors.filter((e) => !e.dismissed);
@@ -631,6 +668,8 @@ export default function App() {
           onLowerHand={handleLowerHand}
           onSpeak={handleSpeak}
           onDownloadTranscript={handleDownloadTranscript}
+          onMuteToggle={handleMuteToggle}
+          onCameraToggle={handleCameraToggle}
         />
       </div>
 

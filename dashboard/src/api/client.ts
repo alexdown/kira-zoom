@@ -215,3 +215,23 @@ export function getConfigDefaults() {
 export function injectContext(sessionId: string, text: string, label?: string) {
   return request<{ status: string; text: string }>('POST', `/api/sessions/${sessionId}/inject-context`, { text, label });
 }
+
+// ── Mute/Unmute ──
+
+export function muteAvatar() {
+  return request<{ status: string; connectedClients: number }>('POST', '/api/avatar/mute');
+}
+
+export function unmuteAvatar() {
+  return request<{ status: string; connectedClients: number }>('POST', '/api/avatar/unmute');
+}
+
+// ── Camera On/Off ──
+
+export function cameraOff(sessionId: string) {
+  return request<{ status: string; message: string }>('POST', `/api/sessions/${sessionId}/camera-off`);
+}
+
+export function cameraOn(sessionId: string) {
+  return request<{ status: string; message: string }>('POST', `/api/sessions/${sessionId}/camera-on`);
+}

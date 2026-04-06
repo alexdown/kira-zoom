@@ -324,6 +324,23 @@ app.post("/api/avatar/speak", (req, res) => {
   res.json({ status: "sent", connectedClients: avatarCmdClients.size });
 });
 
+// Avatar mute — mutes the HeyGen video element on the client page
+// ⚠️ EXPERIMENTAL: Muting via videoElement.muted is untested with Recall.ai page audio capture
+app.post("/api/avatar/mute", (_req, res) => {
+  console.log("[AVATAR] ⚠️ Muting avatar (EXPERIMENTAL — untested with Recall.ai page audio capture)");
+  sendAvatarCommand({ type: "mute" });
+  broadcastDashboard({ type: "mute_status", muted: true });
+  res.json({ status: "muted", connectedClients: avatarCmdClients.size });
+});
+
+// Avatar unmute — unmutes the HeyGen video element on the client page
+app.post("/api/avatar/unmute", (_req, res) => {
+  console.log("[AVATAR] Unmuting avatar");
+  sendAvatarCommand({ type: "unmute" });
+  broadcastDashboard({ type: "mute_status", muted: false });
+  res.json({ status: "unmuted", connectedClients: avatarCmdClients.size });
+});
+
 // Avatar raise hand
 app.post("/api/avatar/raise-hand", async (req, res) => {
   const { botId, message } = req.body as { botId?: string; message?: string };
