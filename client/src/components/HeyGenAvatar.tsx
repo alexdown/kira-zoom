@@ -4,6 +4,18 @@ import { useEffect, useRef, useState } from "react";
 import { useLiveAvatarContext } from "../contexts/LiveAvatarContext";
 import { useLiveAvatarActions } from "../hooks/useLiveAvatarActions";
 import { useSession } from "../hooks/useSession";
+import { setupChromaKey } from "../chromaKey";
+
+/** Read chroma key tuning params from URL, falling back to HeyGen defaults */
+function getChromaKeyOptions() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    minHue: Number(params.get("minHue") ?? 60),
+    maxHue: Number(params.get("maxHue") ?? 180),
+    minSaturation: Number(params.get("minSat") ?? 0.1),
+    threshold: Number(params.get("threshold") ?? 1.0),
+  };
+}
 
 interface HeyGenAvatarProps {
   onError: (error: string) => void;
@@ -12,7 +24,9 @@ interface HeyGenAvatarProps {
 
 export default function HeyGenAvatar({ onError, sessionRef }: HeyGenAvatarProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const hasInitialized = useRef(false);
+  const chromaCleanupRef = useRef<(() => void) | null>(null);
   const [micError, setMicError] = useState<string | null>(null);
 
   const { isAvatarTalking, sessionError, sessionRef: heygenSession } = useLiveAvatarContext();
@@ -35,6 +49,26 @@ export default function HeyGenAvatar({ onError, sessionRef }: HeyGenAvatarProps)
       attachElement(videoRef.current);
     }
   }, [isStreamReady, attachElement]);
+
+  // Start chroma key processing when stream is ready
+  useEffect(() => {
+    if (isStreamReady && videoRef.current && canvasRef.current) {
+      // Stop any previous chroma key loop
+      if (chromaCleanupRef.current) {
+        chromaCleanupRef.current();
+      }
+      const options = getChromaKeyOptions();
+      reportDebug("chromaKey", `starting: minHue=${options.minHue} maxHue=${options.maxHue} minSat=${options.minSaturation} threshold=${options.threshold}`);
+      chromaCleanupRef.current = setupChromaKey(videoRef.current, canvasRef.current, options);
+    }
+
+    return () => {
+      if (chromaCleanupRef.current) {
+        chromaCleanupRef.current();
+        chromaCleanupRef.current = null;
+      }
+    };
+  }, [isStreamReady]);
 
   // Report errors to parent for fallback
   useEffect(() => {
@@ -91,11 +125,23 @@ export default function HeyGenAvatar({ onError, sessionRef }: HeyGenAvatarProps)
 
   return (
     <>
-      {/* Avatar Video - Full Screen */}
+      {/* Hidden video element — HeyGen stream attaches here */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
+        style={{
+          position: "absolute",
+          width: 0,
+          height: 0,
+          opacity: 0,
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* Chroma-keyed canvas — displayed full screen with transparent background */}
+      <canvas
+        ref={canvasRef}
         style={{
           position: "absolute",
           inset: 0,
