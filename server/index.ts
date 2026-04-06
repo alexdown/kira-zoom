@@ -164,6 +164,10 @@ function sendAvatarCommand(command: { type: string; text?: string; mode?: string
 recallWss.on("connection", (ws: WebSocket) => {
   console.log("[RECALL-WS] Recall.ai connected for real-time streaming");
 
+  // Broadcast bot connected status to dashboard
+  broadcastDashboard({ type: "bot_status", status: "in_call_recording" });
+  broadcastDashboard({ type: "heygen_status", status: "connected" });
+
   ws.on("message", (data) => {
     try {
       const msg = JSON.parse(data.toString());
@@ -181,7 +185,16 @@ recallWss.on("connection", (ws: WebSocket) => {
           // Find active session and add transcript
           const sessions = sessionManager.listSessions();
           for (const session of sessions) {
-            if (session.state === "LISTENING" || session.state === "HAND_RAISED" || session.state === "SPEAKING") {
+            // Auto-transition from JOINING to LISTENING when we get first transcript
+            if (session.state === "JOINING" || session.state === "PREPARING" || session.state === "IDLE") {
+              try {
+                sessionManager.updateState(session.id, "LISTENING" as any);
+                broadcast(session.id, { type: "state_change", state: "LISTENING" });
+                console.log(`  [Session] ${session.id}: auto-transitioned to LISTENING (first transcript received)`);
+              } catch { /* ignore state transition errors */ }
+            }
+
+            if (session.state === "LISTENING" || session.state === "HAND_RAISED" || session.state === "SPEAKING" || session.state === "JOINING") {
               if (!isPartial) {
                 sessionManager.addTranscript(session.id, {
                   speaker,

@@ -46,13 +46,13 @@ export function RightPanel({
   onDownloadTranscript,
 }: RightPanelProps) {
   const sessionState = session?.state ?? null;
-  const isInCall = sessionState === 'LISTENING' || sessionState === 'HAND_RAISED' || sessionState === 'SPEAKING';
+  const isInCall = sessionState === 'JOINING' || sessionState === 'LISTENING' || sessionState === 'HAND_RAISED' || sessionState === 'SPEAKING';
   const isDone = sessionState === 'DONE';
 
   return (
     <div className="right-panel">
       {/* Transcript */}
-      <div className="panel transcript-panel">
+      <div className="panel transcript-panel transcript-section">
         <div className="transcript-header">
           <h2 className="section-title">
             <span className="section-icon">📡</span>

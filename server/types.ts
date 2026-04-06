@@ -84,6 +84,9 @@ export interface CreateSessionRequest {
   meetingUrl: string;
   botName?: string;
   paperText?: string;
+  paperSummary?: string;
+  questions?: Question[];
+  comments?: Array<{ author: string; comment: string; anchored_text: string }>;
   config?: SessionConfig;
 }
 
