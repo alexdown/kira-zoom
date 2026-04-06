@@ -476,19 +476,27 @@ export default function App() {
         return;
       }
 
-      // Also send to HeyGen avatar via avatar endpoint
-      const result = await api.speak(state.session.id, payload);
-
-      // Send to avatar WebSocket clients too
-      if (result.text) {
-        try {
-          await api.avatarSpeak(result.text);
-        } catch {
-          // Avatar may not be connected — not critical
-        }
+      // Resolve the text to speak
+      let textToSpeak = payload.text ?? '';
+      if (!textToSpeak && payload.questionId) {
+        const q = state.questions.find((q) => q.id === payload.questionId);
+        textToSpeak = q?.text ?? '';
       }
 
-      dispatch({ type: 'SPEAK_SUCCESS', text: result.text });
+      if (!textToSpeak) {
+        dispatch({ type: 'SPEAK_ERROR', error: 'Could not resolve text to speak' });
+        return;
+      }
+
+      // Send ONLY to HeyGen avatar (not ElevenLabs/output_audio which produces a different voice)
+      try {
+        await api.avatarSpeak(textToSpeak);
+      } catch {
+        // Fallback: try the session speak endpoint (uses ElevenLabs)
+        await api.speak(state.session.id, payload);
+      }
+
+      dispatch({ type: 'SPEAK_SUCCESS', text: textToSpeak });
 
       // Mark question as asked locally
       if (payload.questionId) {
