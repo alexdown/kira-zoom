@@ -361,6 +361,31 @@ export default function App() {
     }).catch((err) => {
       console.error('Failed to fetch sessions:', err);
     });
+
+    // Load defaults from server config
+    api.getConfigDefaults().then((defaults: { defaultBotName: string; defaultTtsVoice: string; defaultSystemPrompt: string; personality?: { style?: string } }) => {
+      dispatch({
+        type: 'SETTINGS_CHANGED',
+        settings: {
+          systemPrompt: defaults.defaultSystemPrompt || '',
+          ttsVoice: defaults.defaultTtsVoice,
+          personalityStyle: (defaults.personality?.style as 'academic' | 'casual' | 'provocative' | 'professional') || 'professional',
+        },
+      });
+      // Also set meeting bot name
+      dispatch({ type: 'BOT_NAME_CHANGED', name: defaults.defaultBotName });
+    }).catch(() => {
+      console.error('Failed to load config defaults');
+    });
+
+    // Load current HeyGen context (overrides server default if available)
+    api.getHeygenContext().then((ctx: { prompt?: string }) => {
+      if (ctx.prompt) {
+        dispatch({ type: 'SETTINGS_CHANGED', settings: { systemPrompt: ctx.prompt } });
+      }
+    }).catch(() => {
+      console.error('Failed to load HeyGen context');
+    });
   }, []);
 
   // ── Action handlers ──

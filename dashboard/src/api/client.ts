@@ -198,3 +198,14 @@ export async function downloadTranscript(sessionId: string) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+export function getConfigDefaults() {
+  return request<{
+    defaultBotName: string;
+    defaultTtsVoice: string;
+    defaultSystemPrompt: string;
+    availableVoices: string[];
+    availableStyles: string[];
+    personality: { name: string; style: string; introPhrase: string };
+  }>('GET', '/api/config/defaults');
+}
