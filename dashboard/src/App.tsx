@@ -545,10 +545,33 @@ export default function App() {
         systemPrompt: state.settings.systemPrompt || undefined,
       });
       dispatch({ type: 'PAPER_ANALYZED', summary: result.summary, questions: result.questions });
+
+      // If a session is active, auto-inject paper + questions + comments
+      if (state.session && state.session.state !== 'DONE') {
+        const parts: string[] = [];
+        if (result.summary) {
+          parts.push(`PAPER SUMMARY:\n${result.summary}`);
+        }
+        if (result.questions.length > 0) {
+          parts.push(`YOUR PREPARED QUESTIONS (ask when appropriate):\n${result.questions.map((q: { text: string; rationale?: string }, i: number) => `${i + 1}. ${q.text}${q.rationale ? ` — Rationale: ${q.rationale}` : ''}`).join('\n')}`);
+        }
+        if (state.paper.comments.length > 0) {
+          parts.push(`DOCUMENT COMMENTS:\n${state.paper.comments.map((c) => `- [${c.author}]${c.anchored_text ? ` on "${c.anchored_text}"` : ''}: "${c.comment}"`).join('\n')}`);
+        }
+        if (parts.length > 0) {
+          try {
+            const fullText = parts.join('\n\n');
+            await api.injectContext(state.session.id, fullText, 'Auto: Paper + Questions');
+            dispatch({ type: 'INJECT_CONTEXT_SUCCESS', injection: { id: crypto.randomUUID(), text: fullText, label: 'Auto: Paper + Questions', timestamp: Date.now(), preview: fullText.substring(0, 100) + '...' } });
+          } catch {
+            // Non-critical — user can still manually inject
+          }
+        }
+      }
     } catch (err) {
       dispatch({ type: 'PAPER_ANALYZE_ERROR', error: (err as Error).message });
     }
-  }, [state.paper.text, state.settings]);
+  }, [state.paper.text, state.paper.comments, state.settings, state.session]);
 
   const handleDownloadTranscript = useCallback(async () => {
     if (!state.session) return;
