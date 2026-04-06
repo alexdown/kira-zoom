@@ -46,7 +46,7 @@ export function RightPanel({
   onDownloadTranscript,
 }: RightPanelProps) {
   const sessionState = session?.state ?? null;
-  const isInCall = sessionState === 'LISTENING' || sessionState === 'HAND_RAISED' || sessionState === 'SPEAKING';
+  const isInCall = sessionState === 'JOINING' || sessionState === 'LISTENING' || sessionState === 'HAND_RAISED' || sessionState === 'SPEAKING';
   const isDone = sessionState === 'DONE';
 
   return (
