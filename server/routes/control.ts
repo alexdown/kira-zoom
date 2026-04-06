@@ -40,6 +40,11 @@ export function createControlRouter(
       const message = DEFAULT_RAISE_HAND_MESSAGE;
       await recall.sendChatMessage(session.botId!, message);
 
+      // Send raise-hand visual to avatar webpage
+      if (sendAvatarCommand) {
+        sendAvatarCommand({ type: "raise-hand" });
+      }
+
       // Update state
       sessionManager.updateState(session.id, SessionState.HAND_RAISED);
 
@@ -195,6 +200,11 @@ export function createControlRouter(
       const session = getSessionWithBot(req.params.id as string);
 
       sessionManager.updateState(session.id, SessionState.LISTENING);
+
+      // Send lower-hand visual to avatar webpage
+      if (sendAvatarCommand) {
+        sendAvatarCommand({ type: "lower-hand" });
+      }
 
       broadcast(session.id, {
         type: "state_change",

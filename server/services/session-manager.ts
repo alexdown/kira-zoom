@@ -13,7 +13,7 @@ import { DEFAULT_PERSONALITY, DEFAULT_SYSTEM_PROMPT } from "../config.js";
 const VALID_TRANSITIONS: Record<SessionState, SessionState[]> = {
   [SessionState.IDLE]: [SessionState.PREPARING, SessionState.JOINING, SessionState.LEAVING],
   [SessionState.PREPARING]: [SessionState.JOINING, SessionState.LEAVING],
-  [SessionState.JOINING]: [SessionState.LISTENING, SessionState.LEAVING],
+  [SessionState.JOINING]: [SessionState.LISTENING, SessionState.HAND_RAISED, SessionState.SPEAKING, SessionState.LEAVING],
   [SessionState.LISTENING]: [
     SessionState.HAND_RAISED,
     SessionState.SPEAKING,
