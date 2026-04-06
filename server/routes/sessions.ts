@@ -132,8 +132,8 @@ export function createSessionsRouter(
       // 3. Update HeyGen context with combined prompt (before bot creation)
       if (config.heygenApiKey && config.heygenContextId) {
         try {
-          const basePrompt =
-            sessionConfig.systemPrompt || config.defaultSystemPrompt || DEFAULT_SYSTEM_PROMPT;
+          // Always start from the clean persona prompt, not accumulated context
+          const basePrompt = DEFAULT_SYSTEM_PROMPT;
 
           const contextPrompt = buildHeygenContextPrompt(
             basePrompt,
