@@ -1,4 +1,4 @@
-import { useReducer, useEffect, useCallback } from 'react';
+import { useReducer, useEffect, useCallback, useState } from 'react';
 import type {
   DashboardState,
   DashboardAction,
@@ -570,6 +570,15 @@ export default function App() {
           dispatch={dispatch}
         />
       )}
+
+      {/* Edit Question Modal */}
+      {state.modals.editQuestion && (
+        <EditQuestionModal
+          questionId={state.modals.editQuestion}
+          questions={state.questions}
+          dispatch={dispatch}
+        />
+      )}
     </div>
   );
 }
@@ -653,6 +662,83 @@ function SettingsModal({
             onClick={() => dispatch({ type: 'MODAL_CLOSED', modal: 'settings' })}
           >
             Save &amp; Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Edit Question Modal ──
+
+function EditQuestionModal({
+  questionId,
+  questions,
+  dispatch,
+}: {
+  questionId: string;
+  questions: DashboardState['questions'];
+  dispatch: React.Dispatch<DashboardAction>;
+}) {
+  const question = questions.find((q) => q.id === questionId);
+  const [text, setText] = useState(question?.text ?? '');
+  const [rationale, setRationale] = useState(question?.rationale ?? '');
+
+  if (!question) return null;
+
+  const handleSave = () => {
+    dispatch({
+      type: 'QUESTION_UPDATED',
+      id: questionId,
+      updates: { text, rationale },
+    });
+    dispatch({ type: 'MODAL_CLOSED', modal: 'editQuestion' });
+  };
+
+  return (
+    <div className="modal-overlay" onClick={() => dispatch({ type: 'MODAL_CLOSED', modal: 'editQuestion' })}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2 className="modal-title">✏️ Edit Question</h2>
+          <button
+            className="modal-close"
+            onClick={() => dispatch({ type: 'MODAL_CLOSED', modal: 'editQuestion' })}
+          >
+            ✕
+          </button>
+        </div>
+        <div className="modal-body">
+          <div className="field">
+            <label className="field-label">Question</label>
+            <textarea
+              className="field-textarea"
+              rows={4}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Type your question here..."
+              autoFocus
+            />
+          </div>
+          <div className="field">
+            <label className="field-label">Rationale (optional)</label>
+            <textarea
+              className="field-textarea"
+              rows={2}
+              value={rationale}
+              onChange={(e) => setRationale(e.target.value)}
+              placeholder="Why is this question important?"
+            />
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button
+            className="btn btn-secondary"
+            onClick={() => dispatch({ type: 'MODAL_CLOSED', modal: 'editQuestion' })}
+          >
+            Cancel
+          </button>
+          <button className="btn btn-primary" onClick={handleSave}>
+            Save
           </button>
         </div>
       </div>
