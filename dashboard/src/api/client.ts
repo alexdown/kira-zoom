@@ -1,4 +1,4 @@
-import type { Session, Question, SessionConfig, ConfigDefaults } from '../types';
+import type { Session, Question, SessionConfig, ConfigDefaults, ExtractedComment } from '../types';
 
 const BASE_URL = '';
 
@@ -36,6 +36,9 @@ export function createSession(data: {
   meetingUrl: string;
   botName?: string;
   paperText?: string;
+  paperSummary?: string;
+  questions?: Question[];
+  comments?: Array<{ author: string; comment: string; anchored_text: string }>;
   config?: SessionConfig;
 }) {
   return request<Session>('POST', '/api/sessions', data);
@@ -109,6 +112,16 @@ export function avatarLowerHand() {
   );
 }
 
+// ── Paper Extraction ──
+
+export function extractPaper(data: string, fileName: string) {
+  return request<{ text: string; comments: ExtractedComment[] }>(
+    'POST',
+    '/api/papers/extract',
+    { data, fileName },
+  );
+}
+
 // ── Paper Analysis ──
 
 export function analyzePaper(data: { text: string; maxQuestions?: number; personality?: { style?: string }; systemPrompt?: string }) {
@@ -153,6 +166,23 @@ export function getDefaults() {
   return request<ConfigDefaults>('GET', '/api/config/defaults');
 }
 
+// ── HeyGen Context ──
+
+export function getHeygenContext() {
+  return request<{ name: string; prompt: string; opening_text: string; id: string }>(
+    'GET',
+    '/api/heygen/context',
+  );
+}
+
+export function updateHeygenContext(data: { name: string; prompt: string; opening_text: string }) {
+  return request<{ name: string; prompt: string; opening_text: string; id: string }>(
+    'PATCH',
+    '/api/heygen/context',
+    data,
+  );
+}
+
 // ── Transcript Download ──
 
 export async function downloadTranscript(sessionId: string) {
@@ -167,4 +197,15 @@ export async function downloadTranscript(sessionId: string) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+export function getConfigDefaults() {
+  return request<{
+    defaultBotName: string;
+    defaultTtsVoice: string;
+    defaultSystemPrompt: string;
+    availableVoices: string[];
+    availableStyles: string[];
+    personality: { name: string; style: string; introPhrase: string };
+  }>('GET', '/api/config/defaults');
 }

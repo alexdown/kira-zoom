@@ -1,10 +1,11 @@
-import { useReducer, useEffect, useCallback } from 'react';
+import { useReducer, useEffect, useCallback, useState } from 'react';
 import type {
   DashboardState,
   DashboardAction,
   Session,
   BotStatus,
   HeygenStatus,
+  ExtractedComment,
 } from './types';
 import { Header } from './components/Header';
 import { LeftPanel } from './components/LeftPanel';
@@ -21,6 +22,8 @@ const initialState: DashboardState = {
     fileName: null,
     text: null,
     summary: null,
+    comments: [],
+    isExtracting: false,
     isAnalyzing: false,
   },
   questions: [],
@@ -93,7 +96,36 @@ function dashboardReducer(state: DashboardState, action: DashboardAction): Dashb
     case 'PAPER_TEXT_SET':
       return {
         ...state,
-        paper: { ...state.paper, text: action.text, fileName: action.fileName ?? null },
+        paper: {
+          ...state.paper,
+          text: action.text,
+          fileName: action.fileName ?? null,
+          comments: action.comments ?? state.paper.comments,
+        },
+      };
+    case 'PAPER_EXTRACT_START':
+      return { ...state, paper: { ...state.paper, isExtracting: true } };
+    case 'PAPER_EXTRACTED':
+      return {
+        ...state,
+        paper: {
+          ...state.paper,
+          isExtracting: false,
+          text: action.text,
+          fileName: action.fileName,
+          comments: action.comments,
+        },
+      };
+    case 'PAPER_EXTRACT_ERROR':
+      return {
+        ...state,
+        paper: { ...state.paper, isExtracting: false },
+        errors: [...state.errors, {
+          id: crypto.randomUUID(),
+          message: action.error,
+          timestamp: Date.now(),
+          dismissed: false,
+        }],
       };
     case 'PAPER_ANALYZE_START':
       return { ...state, paper: { ...state.paper, isAnalyzing: true } };
@@ -117,7 +149,7 @@ function dashboardReducer(state: DashboardState, action: DashboardAction): Dashb
     case 'PAPER_CLEARED':
       return {
         ...state,
-        paper: { fileName: null, text: null, summary: null, isAnalyzing: false },
+        paper: { fileName: null, text: null, summary: null, comments: [], isExtracting: false, isAnalyzing: false },
         questions: [],
       };
 
@@ -329,6 +361,34 @@ export default function App() {
     }).catch((err) => {
       console.error('Failed to fetch sessions:', err);
     });
+
+    // Load defaults from server config, then append HeyGen context
+    let serverPrompt = '';
+    
+    api.getConfigDefaults().then((defaults: { defaultBotName: string; defaultTtsVoice: string; defaultSystemPrompt: string; personality?: { style?: string } }) => {
+      serverPrompt = defaults.defaultSystemPrompt || '';
+      dispatch({
+        type: 'SETTINGS_CHANGED',
+        settings: {
+          systemPrompt: serverPrompt,
+          ttsVoice: defaults.defaultTtsVoice,
+          personalityStyle: (defaults.personality?.style as 'academic' | 'casual' | 'provocative' | 'professional') || 'professional',
+        },
+      });
+      dispatch({ type: 'BOT_NAME_CHANGED', name: defaults.defaultBotName });
+
+      // Then load HeyGen context and append
+      return api.getHeygenContext();
+    }).then((ctx: { prompt?: string }) => {
+      if (ctx.prompt && ctx.prompt !== serverPrompt) {
+        const combined = serverPrompt
+          ? serverPrompt + '\n\n--- Current HeyGen Context ---\n' + ctx.prompt
+          : ctx.prompt;
+        dispatch({ type: 'SETTINGS_CHANGED', settings: { systemPrompt: combined } });
+      }
+    }).catch(() => {
+      console.error('Failed to load config/context');
+    });
   }, []);
 
   // ── Action handlers ──
@@ -341,6 +401,15 @@ export default function App() {
         meetingUrl: state.meeting.zoomUrl,
         botName: state.meeting.botName,
         paperText: state.paper.text ?? undefined,
+        paperSummary: state.paper.summary ?? undefined,
+        questions: state.questions.length > 0 ? state.questions : undefined,
+        comments: state.paper.comments.length > 0
+          ? state.paper.comments.map((c) => ({
+              author: c.author,
+              comment: c.comment,
+              anchored_text: c.anchored_text,
+            }))
+          : undefined,
         config: {
           ttsVoice: state.settings.ttsVoice,
           maxQuestions: state.settings.maxQuestions,
@@ -352,7 +421,7 @@ export default function App() {
     } catch (err) {
       dispatch({ type: 'JOIN_ERROR', error: (err as Error).message });
     }
-  }, [state.meeting, state.paper.text, state.settings]);
+  }, [state.meeting, state.paper, state.questions, state.settings]);
 
   const handleLeave = useCallback(async () => {
     if (!state.session) return;
@@ -407,19 +476,27 @@ export default function App() {
         return;
       }
 
-      // Also send to HeyGen avatar via avatar endpoint
-      const result = await api.speak(state.session.id, payload);
-
-      // Send to avatar WebSocket clients too
-      if (result.text) {
-        try {
-          await api.avatarSpeak(result.text);
-        } catch {
-          // Avatar may not be connected — not critical
-        }
+      // Resolve the text to speak
+      let textToSpeak = payload.text ?? '';
+      if (!textToSpeak && payload.questionId) {
+        const q = state.questions.find((q) => q.id === payload.questionId);
+        textToSpeak = q?.text ?? '';
       }
 
-      dispatch({ type: 'SPEAK_SUCCESS', text: result.text });
+      if (!textToSpeak) {
+        dispatch({ type: 'SPEAK_ERROR', error: 'Could not resolve text to speak' });
+        return;
+      }
+
+      // Send ONLY to HeyGen avatar (not ElevenLabs/output_audio which produces a different voice)
+      try {
+        await api.avatarSpeak(textToSpeak);
+      } catch {
+        // Fallback: try the session speak endpoint (uses ElevenLabs)
+        await api.speak(state.session.id, payload);
+      }
+
+      dispatch({ type: 'SPEAK_SUCCESS', text: textToSpeak });
 
       // Mark question as asked locally
       if (payload.questionId) {
@@ -529,6 +606,15 @@ export default function App() {
           dispatch={dispatch}
         />
       )}
+
+      {/* Edit Question Modal */}
+      {state.modals.editQuestion && (
+        <EditQuestionModal
+          questionId={state.modals.editQuestion}
+          questions={state.questions}
+          dispatch={dispatch}
+        />
+      )}
     </div>
   );
 }
@@ -612,6 +698,83 @@ function SettingsModal({
             onClick={() => dispatch({ type: 'MODAL_CLOSED', modal: 'settings' })}
           >
             Save &amp; Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Edit Question Modal ──
+
+function EditQuestionModal({
+  questionId,
+  questions,
+  dispatch,
+}: {
+  questionId: string;
+  questions: DashboardState['questions'];
+  dispatch: React.Dispatch<DashboardAction>;
+}) {
+  const question = questions.find((q) => q.id === questionId);
+  const [text, setText] = useState(question?.text ?? '');
+  const [rationale, setRationale] = useState(question?.rationale ?? '');
+
+  if (!question) return null;
+
+  const handleSave = () => {
+    dispatch({
+      type: 'QUESTION_UPDATED',
+      id: questionId,
+      updates: { text, rationale },
+    });
+    dispatch({ type: 'MODAL_CLOSED', modal: 'editQuestion' });
+  };
+
+  return (
+    <div className="modal-overlay" onClick={() => dispatch({ type: 'MODAL_CLOSED', modal: 'editQuestion' })}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2 className="modal-title">✏️ Edit Question</h2>
+          <button
+            className="modal-close"
+            onClick={() => dispatch({ type: 'MODAL_CLOSED', modal: 'editQuestion' })}
+          >
+            ✕
+          </button>
+        </div>
+        <div className="modal-body">
+          <div className="field">
+            <label className="field-label">Question</label>
+            <textarea
+              className="field-textarea"
+              rows={4}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Type your question here..."
+              autoFocus
+            />
+          </div>
+          <div className="field">
+            <label className="field-label">Rationale (optional)</label>
+            <textarea
+              className="field-textarea"
+              rows={2}
+              value={rationale}
+              onChange={(e) => setRationale(e.target.value)}
+              placeholder="Why is this question important?"
+            />
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button
+            className="btn btn-secondary"
+            onClick={() => dispatch({ type: 'MODAL_CLOSED', modal: 'editQuestion' })}
+          >
+            Cancel
+          </button>
+          <button className="btn btn-primary" onClick={handleSave}>
+            Save
           </button>
         </div>
       </div>

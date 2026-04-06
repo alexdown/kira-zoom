@@ -66,6 +66,16 @@ export interface Session {
   spokeAt?: string;
 }
 
+// ── Extracted Comment ──
+
+export interface ExtractedComment {
+  id: string;
+  author: string;
+  date: string;
+  comment: string;
+  anchored_text: string;
+}
+
 // ── Dashboard State ──
 
 export type BotStatus =
@@ -88,6 +98,8 @@ export interface DashboardState {
     fileName: string | null;
     text: string | null;
     summary: string | null;
+    comments: ExtractedComment[];
+    isExtracting: boolean;
     isAnalyzing: boolean;
   };
 
@@ -155,7 +167,10 @@ export type DashboardAction =
   | { type: 'SESSION_LOADED'; session: Session }
   | { type: 'SESSION_CLEARED' }
   | { type: 'STATE_CHANGED'; state: SessionState }
-  | { type: 'PAPER_TEXT_SET'; text: string; fileName?: string }
+  | { type: 'PAPER_TEXT_SET'; text: string; fileName?: string; comments?: ExtractedComment[] }
+  | { type: 'PAPER_EXTRACT_START' }
+  | { type: 'PAPER_EXTRACTED'; text: string; fileName: string; comments: ExtractedComment[] }
+  | { type: 'PAPER_EXTRACT_ERROR'; error: string }
   | { type: 'PAPER_ANALYZE_START' }
   | { type: 'PAPER_ANALYZED'; summary: string; questions: Question[] }
   | { type: 'PAPER_ANALYZE_ERROR'; error: string }
