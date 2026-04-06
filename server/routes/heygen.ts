@@ -113,9 +113,9 @@ export function createHeygenRouter(config: Config): Router {
         return;
       }
 
-      const data = await response.json();
+      const data = await response.json() as { code: number; data: Record<string, unknown>; message: string | null };
       console.log(`[HeyGen] Context fetched successfully`);
-      res.json(data);
+      res.json(data.data);
     } catch (err) {
       console.error("[HeyGen] Failed to fetch context:", err);
       res.status(500).json({
