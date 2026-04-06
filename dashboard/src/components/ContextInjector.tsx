@@ -7,6 +7,7 @@ interface ContextInjectorProps {
   injectText: string;
   isInjecting: boolean;
   paper: DashboardState['paper'];
+  questions: DashboardState['questions'];
   contextInjections: ContextInjection[];
   dispatch: React.Dispatch<DashboardAction>;
 }
@@ -16,6 +17,7 @@ export function ContextInjector({
   injectText,
   isInjecting,
   paper,
+  questions,
   contextInjections,
   dispatch,
 }: ContextInjectorProps) {
@@ -48,17 +50,20 @@ export function ContextInjector({
       parts.push(`PAPER SUMMARY:\n${paper.summary}`);
     }
     if (paper.text) {
-      // Include a truncated version of the paper text if no summary
       if (!paper.summary) {
         parts.push(`PAPER TEXT (excerpt):\n${paper.text.slice(0, 3000)}${paper.text.length > 3000 ? '…' : ''}`);
       }
     }
+    const readyQuestions = questions.filter((q) => q.status === 'ready');
+    if (readyQuestions.length > 0) {
+      parts.push(`YOUR PREPARED QUESTIONS (ask when appropriate):\n${readyQuestions.map((q, i) => `${i + 1}. ${q.text}${q.rationale ? ` — Rationale: ${q.rationale}` : ''}`).join('\n')}`);
+    }
     if (parts.length === 0) {
-      dispatch({ type: 'ERROR_ADDED', message: 'No paper content available to inject' });
+      dispatch({ type: 'ERROR_ADDED', message: 'No paper content or questions available to inject' });
       return;
     }
-    doInject(parts.join('\n\n'), 'Paper Summary');
-  }, [paper, doInject, dispatch]);
+    doInject(parts.join('\n\n'), 'Paper Summary + Questions');
+  }, [paper, questions, doInject, dispatch]);
 
   const handleSendComments = useCallback(() => {
     if (paper.comments.length === 0) {

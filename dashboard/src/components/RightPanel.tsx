@@ -161,6 +161,7 @@ export function RightPanel({
               injectText={controls.injectText}
               isInjecting={controls.isInjecting}
               paper={paper}
+              questions={questions}
               contextInjections={contextInjections}
               dispatch={dispatch}
             />
