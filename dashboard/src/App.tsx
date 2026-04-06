@@ -362,29 +362,32 @@ export default function App() {
       console.error('Failed to fetch sessions:', err);
     });
 
-    // Load defaults from server config
+    // Load defaults from server config, then append HeyGen context
+    let serverPrompt = '';
+    
     api.getConfigDefaults().then((defaults: { defaultBotName: string; defaultTtsVoice: string; defaultSystemPrompt: string; personality?: { style?: string } }) => {
+      serverPrompt = defaults.defaultSystemPrompt || '';
       dispatch({
         type: 'SETTINGS_CHANGED',
         settings: {
-          systemPrompt: defaults.defaultSystemPrompt || '',
+          systemPrompt: serverPrompt,
           ttsVoice: defaults.defaultTtsVoice,
           personalityStyle: (defaults.personality?.style as 'academic' | 'casual' | 'provocative' | 'professional') || 'professional',
         },
       });
-      // Also set meeting bot name
       dispatch({ type: 'BOT_NAME_CHANGED', name: defaults.defaultBotName });
-    }).catch(() => {
-      console.error('Failed to load config defaults');
-    });
 
-    // Load current HeyGen context (overrides server default if available)
-    api.getHeygenContext().then((ctx: { prompt?: string }) => {
-      if (ctx.prompt) {
-        dispatch({ type: 'SETTINGS_CHANGED', settings: { systemPrompt: ctx.prompt } });
+      // Then load HeyGen context and append
+      return api.getHeygenContext();
+    }).then((ctx: { prompt?: string }) => {
+      if (ctx.prompt && ctx.prompt !== serverPrompt) {
+        const combined = serverPrompt
+          ? serverPrompt + '\n\n--- Current HeyGen Context ---\n' + ctx.prompt
+          : ctx.prompt;
+        dispatch({ type: 'SETTINGS_CHANGED', settings: { systemPrompt: combined } });
       }
     }).catch(() => {
-      console.error('Failed to load HeyGen context');
+      console.error('Failed to load config/context');
     });
   }, []);
 
