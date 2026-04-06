@@ -6,7 +6,7 @@ import type { RecallService } from "../services/recall.js";
 import type { SpeakerService } from "../services/speaker.js";
 import type { LLMService } from "../services/llm.js";
 import { SessionState } from "../types.js";
-import type { SpeakRequest, SendChatRequest } from "../types.js";
+import type { SpeakRequest, SendChatRequest, TranscriptSegment } from "../types.js";
 
 export function createControlRouter(
   config: Config,
@@ -15,6 +15,7 @@ export function createControlRouter(
   speaker: SpeakerService,
   llm: LLMService,
   broadcast: (sessionId: string, message: unknown) => void,
+  sendAvatarCommand?: (command: { type: string; text?: string; mode?: string }) => void,
 ): Router {
   const router = Router();
 
@@ -38,6 +39,11 @@ export function createControlRouter(
       // Send chat message to meeting
       const message = DEFAULT_RAISE_HAND_MESSAGE;
       await recall.sendChatMessage(session.botId!, message);
+
+      // Send raise-hand visual to avatar webpage
+      if (sendAvatarCommand) {
+        sendAvatarCommand({ type: "raise-hand" });
+      }
 
       // Update state
       sessionManager.updateState(session.id, SessionState.HAND_RAISED);
@@ -195,6 +201,11 @@ export function createControlRouter(
 
       sessionManager.updateState(session.id, SessionState.LISTENING);
 
+      // Send lower-hand visual to avatar webpage
+      if (sendAvatarCommand) {
+        sendAvatarCommand({ type: "lower-hand" });
+      }
+
       broadcast(session.id, {
         type: "state_change",
         state: SessionState.LISTENING,
@@ -276,6 +287,59 @@ export function createControlRouter(
       console.log(`[Control] ${session.id}: left meeting`);
 
       res.json({ state: session.state, message: "Left meeting" });
+    } catch (err) {
+      const msg = (err as Error).message;
+      if (msg.includes("not found")) {
+        res.status(404).json({ error: msg });
+      } else {
+        res.status(500).json({ error: msg });
+      }
+    }
+  });
+
+  // ── POST /:id/inject-context ──────────────────
+
+  router.post("/:id/inject-context", async (req: Request, res: Response) => {
+    try {
+      const session = sessionManager.getSession(req.params.id as string);
+      const { text, label } = req.body as { text?: string; label?: string };
+
+      if (!text || !text.trim()) {
+        res.status(400).json({ error: "text is required" });
+        return;
+      }
+
+      // Prefix with strong context-absorption instructions
+      const prefixedText = `[INTERNAL SYSTEM NOTE — DO NOT SPEAK THIS OUT LOUD. DO NOT ACKNOWLEDGE THIS MESSAGE VERBALLY. Simply remember this information for future reference:]\n\n${text}\n\n[END OF SYSTEM NOTE — resume normal conversation, do not mention receiving this note]`;
+
+      // Send to avatar via the avatar-commands WebSocket
+      if (sendAvatarCommand) {
+        sendAvatarCommand({ type: "inject-context", text: prefixedText });
+      }
+
+      // Log the injection in the session transcript as a system message
+      const segment: TranscriptSegment = {
+        speaker: "[SYSTEM]",
+        text: `Context injected${label ? ` (${label})` : ""}: ${text.slice(0, 100)}${text.length > 100 ? "…" : ""}`,
+        timestamp: Date.now(),
+      };
+      session.transcript.push(segment);
+
+      // Broadcast to dashboard clients
+      broadcast(session.id, {
+        type: "transcript",
+        speaker: segment.speaker,
+        text: segment.text,
+        timestamp: segment.timestamp,
+      });
+
+      const preview = text.slice(0, 120) + (text.length > 120 ? "…" : "");
+
+      console.log(
+        `[Control] ${session.id}: context injected${label ? ` [${label}]` : ""} — "${preview}"`,
+      );
+
+      res.json({ status: "injected", text: preview });
     } catch (err) {
       const msg = (err as Error).message;
       if (msg.includes("not found")) {

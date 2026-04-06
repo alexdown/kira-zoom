@@ -71,7 +71,7 @@ app.use(
 );
 app.use(
   "/api/sessions",
-  createControlRouter(config, sessionManager, recall, speaker, llm, broadcast),
+  createControlRouter(config, sessionManager, recall, speaker, llm, broadcast, sendAvatarCommand),
 );
 app.use(
   "/api/webhooks",

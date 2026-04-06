@@ -6,6 +6,7 @@ import type {
   BotStatus,
   HeygenStatus,
   ExtractedComment,
+  ContextInjection,
 } from './types';
 import { Header } from './components/Header';
 import { LeftPanel } from './components/LeftPanel';
@@ -41,7 +42,10 @@ const initialState: DashboardState = {
     isLoweringHand: false,
     isSpeaking: false,
     customSpeakText: '',
+    isInjecting: false,
+    injectText: '',
   },
+  contextInjections: [],
   status: {
     bot: 'disconnected',
     heygen: 'disconnected',
@@ -338,6 +342,29 @@ function dashboardReducer(state: DashboardState, action: DashboardAction): Dashb
         ),
       };
 
+    // Context Injection
+    case 'INJECT_TEXT_CHANGED':
+      return { ...state, controls: { ...state.controls, injectText: action.text } };
+    case 'INJECT_CONTEXT_START':
+      return { ...state, controls: { ...state.controls, isInjecting: true } };
+    case 'INJECT_CONTEXT_SUCCESS':
+      return {
+        ...state,
+        controls: { ...state.controls, isInjecting: false, injectText: '' },
+        contextInjections: [...state.contextInjections, action.injection],
+      };
+    case 'INJECT_CONTEXT_ERROR':
+      return {
+        ...state,
+        controls: { ...state.controls, isInjecting: false },
+        errors: [...state.errors, {
+          id: crypto.randomUUID(),
+          message: action.error,
+          timestamp: Date.now(),
+          dismissed: false,
+        }],
+      };
+
     default:
       return state;
   }
@@ -490,7 +517,7 @@ export default function App() {
 
       // Send ONLY to HeyGen avatar (not ElevenLabs/output_audio which produces a different voice)
       try {
-        await api.avatarSpeak(textToSpeak);
+        await api.avatarSpeak(textToSpeak, 'exact');
       } catch {
         // Fallback: try the session speak endpoint (uses ElevenLabs)
         await api.speak(state.session.id, payload);
@@ -518,10 +545,33 @@ export default function App() {
         systemPrompt: state.settings.systemPrompt || undefined,
       });
       dispatch({ type: 'PAPER_ANALYZED', summary: result.summary, questions: result.questions });
+
+      // If a session is active, auto-inject paper + questions + comments
+      if (state.session && state.session.state !== 'DONE') {
+        const parts: string[] = [];
+        if (result.summary) {
+          parts.push(`PAPER SUMMARY:\n${result.summary}`);
+        }
+        if (result.questions.length > 0) {
+          parts.push(`YOUR PREPARED QUESTIONS (ask when appropriate):\n${result.questions.map((q: { text: string; rationale?: string }, i: number) => `${i + 1}. ${q.text}${q.rationale ? ` — Rationale: ${q.rationale}` : ''}`).join('\n')}`);
+        }
+        if (state.paper.comments.length > 0) {
+          parts.push(`DOCUMENT COMMENTS:\n${state.paper.comments.map((c) => `- [${c.author}]${c.anchored_text ? ` on "${c.anchored_text}"` : ''}: "${c.comment}"`).join('\n')}`);
+        }
+        if (parts.length > 0) {
+          try {
+            const fullText = parts.join('\n\n');
+            await api.injectContext(state.session.id, fullText, 'Auto: Paper + Questions');
+            dispatch({ type: 'INJECT_CONTEXT_SUCCESS', injection: { id: crypto.randomUUID(), text: fullText, label: 'Auto: Paper + Questions', timestamp: Date.now(), preview: fullText.substring(0, 100) + '...' } });
+          } catch {
+            // Non-critical — user can still manually inject
+          }
+        }
+      }
     } catch (err) {
       dispatch({ type: 'PAPER_ANALYZE_ERROR', error: (err as Error).message });
     }
-  }, [state.paper.text, state.settings]);
+  }, [state.paper.text, state.paper.comments, state.settings, state.session]);
 
   const handleDownloadTranscript = useCallback(async () => {
     if (!state.session) return;
@@ -557,6 +607,8 @@ export default function App() {
           selectedQuestionId={state.selectedQuestionId}
           settings={state.settings}
           isAnalyzing={state.paper.isAnalyzing}
+          isInCall={!!(state.session && ['JOINING', 'LISTENING', 'HAND_RAISED', 'SPEAKING'].includes(state.session.state))}
+          contextInjections={state.contextInjections}
           dispatch={dispatch}
           onAnalyze={handleAnalyze}
         />
@@ -570,6 +622,8 @@ export default function App() {
           controls={state.controls}
           questions={state.questions}
           selectedQuestionId={state.selectedQuestionId}
+          paper={state.paper}
+          contextInjections={state.contextInjections}
           dispatch={dispatch}
           onJoin={handleJoin}
           onLeave={handleLeave}
@@ -682,14 +736,17 @@ function SettingsModal({
             />
           </div>
           <div className="field">
-            <label className="field-label">System Prompt Override</label>
+            <label className="field-label">System Prompt (HeyGen Persona Only)</label>
             <textarea
               className="textarea"
               rows={4}
               value={settings.systemPrompt}
               onChange={(e) => dispatch({ type: 'SETTINGS_CHANGED', settings: { systemPrompt: e.target.value } })}
-              placeholder="Leave empty to use server default"
+              placeholder="You are Kira, an AI Principal Solutions Architect... (persona prompt only — paper/comments context is injected separately)"
             />
+            <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
+              Enter only the persona prompt here. Paper content and comments are assembled automatically on join and can be injected mid-call via the context panel.
+            </p>
           </div>
         </div>
         <div className="modal-footer">

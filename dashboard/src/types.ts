@@ -125,7 +125,12 @@ export interface DashboardState {
     isLoweringHand: boolean;
     isSpeaking: boolean;
     customSpeakText: string;
+    isInjecting: boolean;
+    injectText: string;
   };
+
+  // Context injections log
+  contextInjections: ContextInjection[];
 
   // Status
   status: {
@@ -157,6 +162,14 @@ export interface AppError {
   message: string;
   timestamp: number;
   dismissed: boolean;
+}
+
+export interface ContextInjection {
+  id: string;
+  label: string;
+  text: string;
+  timestamp: number;
+  preview: string;
 }
 
 // ── Reducer Actions ──
@@ -207,7 +220,11 @@ export type DashboardAction =
   | { type: 'MODAL_OPENED'; modal: 'settings' | 'editQuestion'; data?: string }
   | { type: 'MODAL_CLOSED'; modal: 'settings' | 'editQuestion' }
   | { type: 'ERROR_ADDED'; message: string }
-  | { type: 'ERROR_DISMISSED'; id: string };
+  | { type: 'ERROR_DISMISSED'; id: string }
+  | { type: 'INJECT_TEXT_CHANGED'; text: string }
+  | { type: 'INJECT_CONTEXT_START' }
+  | { type: 'INJECT_CONTEXT_SUCCESS'; injection: ContextInjection }
+  | { type: 'INJECT_CONTEXT_ERROR'; error: string };
 
 // ── API Response Types ──
 
