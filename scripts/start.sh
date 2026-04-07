@@ -1,5 +1,5 @@
 #!/bin/bash
-# Kira startup script — starts tunnel + server
+# Kira startup script — starts cloudflared tunnel + server
 # Usage: bash scripts/start.sh
 
 set -e
@@ -7,43 +7,25 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
-echo "🔧 Starting localhost.run tunnel..."
+# Load token from .env
+source .env
 
-# Kill any existing tunnel/server
-pkill -f "ssh.*localhost.run" 2>/dev/null || true
+echo "🔧 Starting Cloudflare tunnel..."
+pkill -f "cloudflared" 2>/dev/null || true
 pkill -f "tsx server/index" 2>/dev/null || true
 sleep 1
 
-# Start tunnel in background, capture the URL
-TUNNEL_LOG=$(mktemp)
-ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/localhost_run -R 80:localhost:3000 ssh.localhost.run > "$TUNNEL_LOG" 2>&1 &
+# Ensure stable URL in .env
+sed -i "s|^WEBHOOK_BASE_URL=.*|WEBHOOK_BASE_URL=https://kira-zoom.alessiobasso.com|" .env
+sed -i "s|^AVATAR_PUBLIC_URL=.*|AVATAR_PUBLIC_URL=https://kira-zoom.alessiobasso.com|" .env
+
+# Start cloudflared in background
+/home/ubuntu/cloudflared tunnel run --token "$CLOUDFLARE_TUNNEL_TOKEN" &
 TUNNEL_PID=$!
+echo "   ✅ Tunnel started (PID: $TUNNEL_PID)"
+echo "   ✅ URL: https://kira-zoom.alessiobasso.com"
 
-# Wait for tunnel URL to appear
-echo "   Waiting for tunnel URL..."
-for i in $(seq 1 30); do
-    TUNNEL_URL=$(grep -oP 'https://[a-z0-9]+\.lhr\.life' "$TUNNEL_LOG" | head -1)
-    if [ -n "$TUNNEL_URL" ]; then
-        break
-    fi
-    sleep 1
-done
-
-if [ -z "$TUNNEL_URL" ]; then
-    echo "❌ Failed to get tunnel URL after 30s"
-    cat "$TUNNEL_LOG"
-    exit 1
-fi
-
-echo "   ✅ Tunnel: $TUNNEL_URL (PID: $TUNNEL_PID)"
-
-# Update .env with the tunnel URL
-sed -i "s|^WEBHOOK_BASE_URL=.*|WEBHOOK_BASE_URL=$TUNNEL_URL|" .env
-sed -i "s|^AVATAR_PUBLIC_URL=.*|AVATAR_PUBLIC_URL=$TUNNEL_URL|" .env
-echo "   ✅ Updated .env"
-
-# Save tunnel URL for other scripts
-echo "$TUNNEL_URL" > /tmp/kira_tunnel_url
+sleep 2
 
 echo ""
 echo "🤖 Starting Kira server..."
