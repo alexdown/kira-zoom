@@ -78,10 +78,6 @@ export default function App() {
               heygenSessionRef.current.message(msg.text);
             }
             setHandRaised(false); // Lower hand after speaking
-          } else if (msg.type === "inject-context" && msg.text && heygenSessionRef.current) {
-            // Context injection — send to HeyGen LLM for silent absorption
-            heygenSessionRef.current.message(msg.text);
-            console.log("[AvatarCmd] Context injected:", msg.text.substring(0, 60));
           } else if (msg.type === "interrupt" && heygenSessionRef.current) {
             heygenSessionRef.current.interrupt();
           } else if (msg.type === "raise-hand") {

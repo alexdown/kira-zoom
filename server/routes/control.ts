@@ -349,6 +349,8 @@ export function createControlRouter(
   });
 
   // ── POST /:id/inject-context ──────────────────
+  // Silent context injection via HeyGen REST API (PATCH context prompt).
+  // Does NOT send anything via WebSocket — avoids Kira speaking the context aloud.
 
   router.post("/:id/inject-context", async (req: Request, res: Response) => {
     try {
@@ -360,15 +362,67 @@ export function createControlRouter(
         return;
       }
 
-      // Prefix with strong context-absorption instructions
-      const prefixedText = `[INTERNAL SYSTEM NOTE — DO NOT SPEAK THIS OUT LOUD. DO NOT ACKNOWLEDGE THIS MESSAGE VERBALLY. Simply remember this information for future reference:]\n\n${text}\n\n[END OF SYSTEM NOTE — resume normal conversation, do not mention receiving this note]`;
+      const { heygenApiKey, heygenContextId } = config;
 
-      // Send to avatar via the avatar-commands WebSocket
-      if (sendAvatarCommand) {
-        sendAvatarCommand({ type: "inject-context", text: prefixedText });
+      if (!heygenApiKey || !heygenContextId) {
+        res.status(500).json({ error: "HeyGen API key or context ID not configured" });
+        return;
       }
 
-      // Log the injection in the session transcript as a system message
+      // Fetch current context from HeyGen
+      const getRes = await fetch(
+        `https://api.liveavatar.com/v1/contexts/${heygenContextId}`,
+        {
+          method: "GET",
+          headers: { "X-API-KEY": heygenApiKey },
+        },
+      );
+
+      if (!getRes.ok) {
+        const errText = await getRes.text();
+        throw new Error(`HeyGen GET context failed: ${getRes.status} ${errText}`);
+      }
+
+      const ctxData = (await getRes.json()) as {
+        code: number;
+        data: { name?: string; prompt?: string; opening_text?: string };
+        message: string | null;
+      };
+      const currentPrompt: string = ctxData?.data?.prompt ?? "";
+      const currentName: string = ctxData?.data?.name ?? "Kira Meeting Context";
+      const currentOpeningText: string = ctxData?.data?.opening_text ?? "";
+
+      // Append new context to existing prompt
+      const timestamp = new Date().toISOString();
+      const updatedPrompt = `${currentPrompt}\n\n[CONTEXT UPDATE ${timestamp}${label ? ` — ${label}` : ""}]\n${text}\n[END CONTEXT UPDATE]`;
+
+      // PATCH HeyGen context — all three fields required by the API
+      const patchRes = await fetch(
+        `https://api.liveavatar.com/v1/contexts/${heygenContextId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "X-API-KEY": heygenApiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: currentName,
+            prompt: updatedPrompt,
+            opening_text: currentOpeningText,
+          }),
+        },
+      );
+
+      if (!patchRes.ok) {
+        const errText = await patchRes.text();
+        throw new Error(`HeyGen PATCH failed: ${patchRes.status} ${errText}`);
+      }
+
+      console.log(
+        `[Control] ${session.id}: context injected silently via HeyGen PATCH${label ? ` [${label}]` : ""}`,
+      );
+
+      // Log to session transcript
       const segment: TranscriptSegment = {
         speaker: "[SYSTEM]",
         text: `Context injected${label ? ` (${label})` : ""}: ${text.slice(0, 100)}${text.length > 100 ? "…" : ""}`,
@@ -376,7 +430,6 @@ export function createControlRouter(
       };
       session.transcript.push(segment);
 
-      // Broadcast to dashboard clients
       broadcast(session.id, {
         type: "transcript",
         speaker: segment.speaker,
@@ -384,20 +437,10 @@ export function createControlRouter(
         timestamp: segment.timestamp,
       });
 
-      const preview = text.slice(0, 120) + (text.length > 120 ? "…" : "");
-
-      console.log(
-        `[Control] ${session.id}: context injected${label ? ` [${label}]` : ""} — "${preview}"`,
-      );
-
-      res.json({ status: "injected", text: preview });
+      res.json({ injected: true, label, chars: text.length });
     } catch (err) {
-      const msg = (err as Error).message;
-      if (msg.includes("not found")) {
-        res.status(404).json({ error: msg });
-      } else {
-        res.status(500).json({ error: msg });
-      }
+      console.error("[Control] inject-context error:", err);
+      res.status(500).json({ error: (err as Error).message });
     }
   });
 
