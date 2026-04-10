@@ -324,28 +324,35 @@ async function recoverSessions(): Promise<number> {
       return 0;
     }
 
-    console.log(
-      `[Recovery] Found ${activeBots.length} active bot(s) — recovering sessions...`,
+    // Sort by created_at descending — most recent first
+    activeBots.sort(
+      (a: any, b: any) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     );
 
-    for (const bot of activeBots) {
-      const meetingUrl = bot.meeting_url ?? "unknown";
-      const botName = bot.bot_name ?? config.defaultBotName;
+    const bot = activeBots[0];
 
-      // Create a session with the bot's existing ID
-      const session = sessionManager.createSession(meetingUrl, botName, {});
-      session.botId = bot.id;
-      session.state = SessionState.LISTENING; // best guess — bot is in call
-
-      console.log(
-        `[Recovery] Recovered session ${session.id} for bot ${bot.id.slice(0, 8)} in ${meetingUrl}`,
+    if (activeBots.length > 1) {
+      const skipped = activeBots
+        .slice(1)
+        .map((b: any) => b.id.slice(0, 8))
+        .join(", ");
+      console.warn(
+        `[Recovery] Found ${activeBots.length} active bots — recovering most recent only. Skipped: ${skipped}`,
       );
     }
 
-    return activeBots.length;
+    const meetingUrl = bot.meeting_url ?? "unknown";
+    const botName = bot.bot_name ?? config.defaultBotName;
+    const session = sessionManager.createSession(meetingUrl, botName, {});
+    session.botId = bot.id;
+    session.state = SessionState.LISTENING;
+    console.log(
+      `[Recovery] Recovered session ${session.id} for bot ${bot.id.slice(0, 8)} in ${meetingUrl}`,
+    );
+    return 1;
   } catch (err) {
     console.error("[Recovery] Failed to recover sessions:", err);
-    // Non-fatal — server starts normally even if recovery fails
     return 0;
   }
 }
@@ -404,7 +411,7 @@ app.post("/api/avatar/lower-hand", (_req, res) => {
 
   server.listen(config.port, () => {
     const recoveredLine = recovered > 0
-      ? `║  Recovered → ${String(recovered).padEnd(1)} active session(s) from Recall.ai  ║\n`
+      ? `║  Recovered → 1 active session from Recall.ai ║\n`
       : "";
     console.log(`
 ╔══════════════════════════════════════════════╗
