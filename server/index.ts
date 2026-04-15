@@ -14,6 +14,7 @@ import { createControlRouter } from "./routes/control.js";
 import { createWebhooksRouter } from "./routes/webhooks.js";
 import { createHeygenRouter } from "./routes/heygen.js";
 import { createDashboardRouter } from "./routes/dashboard.js";
+import { SessionState } from "./types.js";
 
 // ──────────────────────────────────────────────
 // Config & Services
@@ -312,6 +313,51 @@ wss.on("connection", (ws: WebSocket, sessionId: string) => {
 });
 
 // ──────────────────────────────────────────────
+// Session Recovery
+// ──────────────────────────────────────────────
+
+async function recoverSessions(): Promise<number> {
+  try {
+    const activeBots = await recall.listActiveBots();
+    if (!activeBots.length) {
+      console.log("[Recovery] No active bots found");
+      return 0;
+    }
+
+    // Sort by created_at descending — most recent first
+    activeBots.sort(
+      (a: any, b: any) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+
+    const bot = activeBots[0];
+
+    if (activeBots.length > 1) {
+      const skipped = activeBots
+        .slice(1)
+        .map((b: any) => b.id.slice(0, 8))
+        .join(", ");
+      console.warn(
+        `[Recovery] Found ${activeBots.length} active bots — recovering most recent only. Skipped: ${skipped}`,
+      );
+    }
+
+    const meetingUrl = bot.meeting_url ?? "unknown";
+    const botName = bot.bot_name ?? config.defaultBotName;
+    const session = sessionManager.createSession(meetingUrl, botName, {});
+    session.botId = bot.id;
+    session.state = SessionState.LISTENING;
+    console.log(
+      `[Recovery] Recovered session ${session.id} for bot ${bot.id.slice(0, 8)} in ${meetingUrl}`,
+    );
+    return 1;
+  } catch (err) {
+    console.error("[Recovery] Failed to recover sessions:", err);
+    return 0;
+  }
+}
+
+// ──────────────────────────────────────────────
 // Start
 // ──────────────────────────────────────────────
 
@@ -359,17 +405,25 @@ app.post("/api/avatar/lower-hand", (_req, res) => {
   res.json({ status: "hand_lowered" });
 });
 
-server.listen(config.port, () => {
-  console.log(`
+// Start server with session recovery
+(async () => {
+  const recovered = await recoverSessions();
+
+  server.listen(config.port, () => {
+    const recoveredLine = recovered > 0
+      ? `║  Recovered → 1 active session from Recall.ai ║\n`
+      : "";
+    console.log(`
 ╔══════════════════════════════════════════════╗
 ║   🤖  Kira — AI Meeting Bot Server          ║
 ╠══════════════════════════════════════════════╣
 ║  HTTP   → http://localhost:${String(config.port).padEnd(5)}            ║
 ║  WS     → ws://localhost:${String(config.port).padEnd(5)}/ws/sessions/  ║
 ║  Webhook→ ${config.webhookBaseUrl.padEnd(33)}║
-╚══════════════════════════════════════════════╝
-  `);
-});
+${recoveredLine}╚══════════════════════════════════════════════╝
+    `);
+  });
+})();
 
 export { config, sessionManager, recall, speaker, llm };
 

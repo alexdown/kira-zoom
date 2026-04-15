@@ -192,6 +192,33 @@ export class RecallService {
   }
 
   /**
+   * List bots that are currently active in a call.
+   * Fetches recent bots from Recall.ai and filters by latest status.
+   */
+  async listActiveBots(): Promise<any[]> {
+    const res = await fetch(`${this.baseUrl}/bot/?limit=20`, {
+      headers: { Authorization: `Token ${this.apiKey}` },
+    });
+    if (!res.ok) throw new Error(`Recall listBots failed: ${res.status}`);
+    const data = (await res.json()) as any;
+    const bots = data.results ?? [];
+
+    // Filter to only bots currently in a call
+    const activeStatuses = [
+      "in_call_recording",
+      "in_call_not_recording",
+      "in_waiting_room",
+      "joining_call",
+    ];
+    return bots.filter((bot: any) => {
+      const changes = bot.status_changes ?? [];
+      if (!changes.length) return false;
+      const latest = changes[changes.length - 1].code;
+      return activeStatuses.includes(latest);
+    });
+  }
+
+  /**
    * Start/restore the bot's output media (camera on).
    * ⚠️ EXPERIMENTAL: Re-enabling output_media after stopping it is untested.
    * Uses POST /bot/{id}/output_media/ with the avatar webpage config.
