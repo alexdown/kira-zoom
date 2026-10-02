@@ -15,6 +15,8 @@ import { createWebhooksRouter } from "./routes/webhooks.js";
 import { createHeygenRouter } from "./routes/heygen.js";
 import { createDashboardRouter } from "./routes/dashboard.js";
 import { SessionState } from "./types.js";
+import { detectDirectAddress, buildNudgeMessage } from "./services/address-detector.js";
+import { decideNudge, type LastNudge } from "./services/nudge-decision.js";
 
 // ──────────────────────────────────────────────
 // Config & Services
@@ -107,9 +109,59 @@ const wss = new WebSocketServer({ noServer: true });
 // Separate WSS for Recall.ai real-time data
 const recallWss = new WebSocketServer({ noServer: true });
 
-// Avatar command WebSocket (server → client: speak, raise-hand, interrupt)
+// Avatar command WebSocket (bidirectional):
+//   server → client: speak, raise-hand, interrupt, mute, ...
+//   client → server: { type: "avatar_speaking", speaking: boolean }
 const avatarCmdWss = new WebSocketServer({ noServer: true });
 const avatarCmdClients = new Set<WebSocket>();
+
+// ──────────────────────────────────────────────
+// Transcript nudge state (in-memory, per session)
+// ──────────────────────────────────────────────
+
+interface NudgeState {
+  /** True while a guard timer is pending for this session (debounce). */
+  pending: boolean;
+  /** The last nudge dispatched for this session, for duplicate suppression. */
+  lastNudge: LastNudge | null;
+}
+
+/** Per-session nudge bookkeeping, keyed by session id. */
+const nudgeStates = new Map<string, NudgeState>();
+
+/**
+ * Epoch ms when the HeyGen avatar last started speaking, as reported by the
+ * client over /ws/avatar-commands.
+ *
+ * SINGLE-SESSION CONSTRAINT: this is one module-level timestamp (not per
+ * session), and sendAvatarCommand() below fans every command out to ALL
+ * connected avatar clients with no session routing. The whole nudge path
+ * therefore assumes exactly one active meeting/avatar at a time, which is how
+ * the rest of the server operates (recallWss and recoverSessions both resolve a
+ * single active session). This satisfies issue #2's "noisy multi-person"
+ * criterion (many speakers in ONE meeting). It does NOT support multiple
+ * concurrent meetings: with two sessions, one avatar's speech would suppress the
+ * other's nudge and a nudge computed for session A would be spoken to every
+ * avatar. Supporting concurrent meetings would require keying this timestamp by
+ * session and routing sendAvatarCommand per session; that is out of scope here.
+ *
+ * FAILURE MODE (socket drop): this signal depends on the client reporting
+ * avatar_speaking over /ws/avatar-commands. If that socket is down at the moment
+ * HeyGen answers on its own, the server observes no speech and may still fire the
+ * nudge, producing a double response. This is a safety-net feature layered on top
+ * of HeyGen's native behavior, so the degraded case is an extra prompt rather than
+ * a missed answer; it is accepted rather than guarded with a server-side fallback.
+ */
+let avatarLastSpeakStartedAt: number | null = null;
+
+function getNudgeState(sessionId: string): NudgeState {
+  let state = nudgeStates.get(sessionId);
+  if (!state) {
+    state = { pending: false, lastNudge: null };
+    nudgeStates.set(sessionId, state);
+  }
+  return state;
+}
 
 // Dashboard WebSocket — receives ALL session events (transcript, state, status)
 const dashboardWss = new WebSocketServer({ noServer: true });
@@ -152,14 +204,129 @@ dashboardWss.on("connection", (ws: WebSocket) => {
 avatarCmdWss.on("connection", (ws: WebSocket) => {
   console.log("[AVATAR-CMD] Client connected");
   avatarCmdClients.add(ws);
+
+  // Reverse channel: the client reports whether the HeyGen avatar is speaking
+  // so the nudge guard can tell when HeyGen already answered. The socket stays
+  // fully functional for outbound commands; this only adds an inbound handler.
+  ws.on("message", (data) => {
+    try {
+      const msg = JSON.parse(data.toString());
+      if (msg?.type === "avatar_speaking") {
+        if (msg.speaking) {
+          avatarLastSpeakStartedAt = Date.now();
+          console.log("[Nudge] Avatar started speaking (reported by client)");
+        } else {
+          console.log("[Nudge] Avatar stopped speaking (reported by client)");
+        }
+      }
+    } catch (err) {
+      console.error("[AVATAR-CMD] Parse error:", (err as Error).message);
+    }
+  });
+
   ws.on("close", () => { console.log("[AVATAR-CMD] Client disconnected"); avatarCmdClients.delete(ws); });
+  ws.on("error", (err) => { console.error("[AVATAR-CMD] Error:", err.message); });
 });
 
+// Fans a command out to ALL connected avatar clients. There is no per-session
+// routing: this relies on the single-session constraint documented on
+// avatarLastSpeakStartedAt above (one active meeting/avatar at a time).
 function sendAvatarCommand(command: { type: string; text?: string; mode?: string }) {
   const payload = JSON.stringify(command);
   for (const client of avatarCmdClients) {
     if (client.readyState === WebSocket.OPEN) client.send(payload);
   }
+}
+
+/** Bot/system speakers that must never trigger detection (feedback-loop guard). */
+const NON_HUMAN_SPEAKERS = new Set(["[SYSTEM]", "SYSTEM", "Kira"]);
+
+/**
+ * Run direct-address detection on a FINAL transcript segment and, when the
+ * segment is addressed to Kira, schedule a guarded nudge. Only operates on
+ * finalized segments; the caller must not pass partial segments.
+ */
+function maybeScheduleNudge(sessionId: string, speaker: string, text: string): void {
+  const session = (() => {
+    try {
+      return sessionManager.getSession(sessionId);
+    } catch {
+      return undefined;
+    }
+  })();
+  if (!session) return;
+
+  // Resolve the per-session toggle against the env default.
+  const enabled = session.config.transcriptNudgeEnabled ?? config.transcriptNudgeEnabled;
+  if (!enabled) return;
+
+  // Feedback-loop guard: never detect on bot/system speakers or the configured
+  // bot name. The nudge prompt is spoken by the avatar (speaker "Kira") so it
+  // can never be re-detected as an address.
+  const botFirstToken = (session.config.personality?.name ?? session.botName ?? "")
+    .split(/[\s(]/)[0]
+    ?.trim();
+  if (NON_HUMAN_SPEAKERS.has(speaker) || (botFirstToken && speaker === botFirstToken)) {
+    return;
+  }
+
+  // Detect using the resolved bot name so a renamed bot is still matched by
+  // name. "Kira" remains the baseline when no name resolves. This keeps the
+  // detector symmetric with the feedback-loop exclusion above, which also uses
+  // the configured name.
+  const result = detectDirectAddress(text, { name: botFirstToken || undefined });
+  if (!result.addressed) return;
+
+  const state = getNudgeState(sessionId);
+  // Debounce: ignore if a guard timer is already pending for this session.
+  if (state.pending) {
+    console.log(`[Nudge] Detection ignored (nudge already pending) for session ${sessionId}`);
+    return;
+  }
+
+  const windowMs = session.config.transcriptNudgeWindowMs ?? config.transcriptNudgeWindowMs;
+  const excerpt = result.excerpt;
+  const detectionTime = Date.now();
+
+  // Early duplicate check so we do not even start a timer for a repeat.
+  if (
+    state.lastNudge &&
+    state.lastNudge.excerpt === excerpt &&
+    detectionTime - state.lastNudge.time < windowMs
+  ) {
+    console.log(`[Nudge] Detection ignored (duplicate excerpt within window) for session ${sessionId}`);
+    return;
+  }
+
+  console.log(`[Nudge] Direct address detected for session ${sessionId}; guard window ${windowMs}ms: "${excerpt}"`);
+  state.pending = true;
+
+  setTimeout(() => {
+    state.pending = false;
+    const decision = decideNudge({
+      detectionTime,
+      excerpt,
+      lastAvatarSpeakStartedAt: avatarLastSpeakStartedAt,
+      lastNudge: state.lastNudge,
+      enabled: session.config.transcriptNudgeEnabled ?? config.transcriptNudgeEnabled,
+      windowMs,
+      now: Date.now(),
+    });
+
+    if (!decision.nudge) {
+      if (decision.reason === "suppress-avatar-speaking") {
+        console.log(`[Nudge] Suppressed (${decision.reason}): HeyGen already answered for session ${sessionId}`);
+      } else {
+        console.log(`[Nudge] Suppressed (${decision.reason}) for session ${sessionId}`);
+      }
+      return;
+    }
+
+    const message = buildNudgeMessage(excerpt);
+    sendAvatarCommand({ type: "speak", text: message, mode: "message" });
+    state.lastNudge = { excerpt, time: Date.now() };
+    console.log(`[Nudge] Dispatched nudge for session ${sessionId}: ${message.substring(0, 80)}`);
+  }, windowMs);
 }
 
 recallWss.on("connection", (ws: WebSocket) => {
@@ -215,6 +382,8 @@ recallWss.on("connection", (ws: WebSocket) => {
                   text,
                   timestamp: Date.now(),
                 });
+                // Direct-address detection + guarded nudge (FINAL segments only)
+                maybeScheduleNudge(session.id, speaker, text);
               }
             }
           }

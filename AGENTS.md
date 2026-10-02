@@ -261,3 +261,9 @@ Recall.ai bot → loads webpage via output_media (HTTPS tunnel)
 - Dashboard accessible via `https://<tunnel>/dashboard/`
 - Recall.ai output_media uses `https://<tunnel>/` for avatar webpage
 - No direct access to port 3000 needed from the internet
+
+---
+
+## Detect when Kira is addressed (issue #2)
+
+HeyGen's voice chat normally decides on its own when Kira speaks, but it can miss a direct question in crosstalk or when her name is unclear. The chosen safety net is a server-side transcript monitor (spec: `.kiro/specs/detect-when-addressed/`). On FINAL transcript segments only (`transcript.data` on `/ws/recall`, never `transcript.partial_data`), a pure detector flags a direct address when "Kira" appears as a word AND the segment carries a question or solicitation. When one is detected and the avatar is not already speaking, a short guard timer (about 5s, configurable) runs; if HeyGen has not started Kira speaking by the time it elapses, the server nudges her via the existing `sendAvatarCommand({ type: "speak", text, mode: "message" })` path over `/ws/avatar-commands`, which the client forwards to `heygenSession.message(text)` (routes through HeyGen's LLM, so it is a prompt and not a verbatim repeat). The avatar-speaking signal that prevents double responses comes from the client's HeyGen `AVATAR_SPEAK_STARTED`/`AVATAR_SPEAK_ENDED` events (`LiveAvatarContext`), reported back to the server over a now-bidirectional `/ws/avatar-commands` socket. The feature is configurable per session (`transcriptNudgeEnabled`) and via an env default (`TRANSCRIPT_NUDGE_ENABLED`). Keep this spoken-nudge path separate from the silent context-injection (HeyGen PATCH) path, and keep every nudge string free of em dash characters.

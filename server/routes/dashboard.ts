@@ -274,6 +274,8 @@ export function createDashboardRouter(
       ],
       availableStyles: ["academic", "casual", "provocative", "professional"],
       personality: DEFAULT_PERSONALITY,
+      transcriptNudgeEnabled: config.transcriptNudgeEnabled,
+      transcriptNudgeWindowMs: config.transcriptNudgeWindowMs,
     });
   });
 

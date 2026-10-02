@@ -44,6 +44,20 @@ export default function App() {
   // Reference to the HeyGen session — set by HeyGenAvatar when ready
   const heygenSessionRef = useRef<any>(null);
 
+  // Reference to the avatar-command WebSocket. The socket is bidirectional: it
+  // receives speak/raise-hand/etc. commands AND we send avatar-speaking state
+  // back to the server over it so the nudge guard knows HeyGen already answered.
+  const avatarCmdWsRef = useRef<WebSocket | null>(null);
+
+  // Report HeyGen avatar-speaking transitions to the server. Called by
+  // HeyGenAvatar when isAvatarTalking changes.
+  const reportAvatarSpeaking = useCallback((speaking: boolean) => {
+    const ws = avatarCmdWsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "avatar_speaking", speaking, sessionId }));
+    }
+  }, [sessionId]);
+
   const botState: BotState = (state as BotState) || "JOINING";
   const statusText = STATUS_TEXT[botState] ?? botState;
 
@@ -61,6 +75,7 @@ export default function App() {
 
     function connect() {
       ws = new WebSocket(wsUrl);
+      avatarCmdWsRef.current = ws;
 
       ws.onopen = () => {
         console.log("[AvatarCmd] Connected");
@@ -119,6 +134,7 @@ export default function App() {
     connect();
     return () => {
       clearTimeout(reconnectTimer);
+      avatarCmdWsRef.current = null;
       ws?.close();
     };
   }, []);
@@ -171,7 +187,11 @@ export default function App() {
         )}
 
         <LiveAvatarContextProvider onFatalError={handleHeygenError}>
-          <HeyGenAvatar onError={handleHeygenError} sessionRef={heygenSessionRef} />
+          <HeyGenAvatar
+            onError={handleHeygenError}
+            sessionRef={heygenSessionRef}
+            onAvatarSpeakingChange={reportAvatarSpeaking}
+          />
         </LiveAvatarContextProvider>
       </div>
     );
