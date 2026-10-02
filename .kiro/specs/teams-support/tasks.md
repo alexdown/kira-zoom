@@ -37,7 +37,7 @@ and the components in `design.md`. Check off tasks as they complete.
     the new fifth argument to `recall.createBot(...)`.
   - _Requirements: 1.5, 2.3_
 
-- [ ] 5. Dashboard: label the meeting-URL field for Zoom or Teams
+- [x] 5. Dashboard: label the meeting-URL field for Zoom or Teams
   - In `dashboard/src/components/MeetingControls.tsx`, update the label to
     "Meeting URL (Zoom or Teams)" and extend the placeholder to indicate a
     `teams.microsoft.com` URL is accepted.
@@ -45,7 +45,7 @@ and the components in `design.md`. Check off tasks as they complete.
     value.
   - _Requirements: 4.1, 4.2, 4.3_
 
-- [ ] 6. Verify (build + type-check + detection + payload inspection)
+- [x] 6. Verify (build + type-check + detection + payload inspection)
   - Run `npm run typecheck` (server) and `npm run build` in `dashboard/`;
     both must pass.
   - Throwaway `tsx` detection check: Teams meetup-join URL → `teams`;

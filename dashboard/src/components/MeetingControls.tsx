@@ -23,11 +23,11 @@ export function MeetingControls({
     <div className="meeting-controls">
       <div className="meeting-url-group">
         <div className="field">
-          <label className="field-label">Zoom URL</label>
+          <label className="field-label">Meeting URL (Zoom or Teams)</label>
           <input
             className="input"
             type="url"
-            placeholder="https://zoom.us/j/123456789?pwd=..."
+            placeholder="https://zoom.us/j/123456789?pwd=... or https://teams.microsoft.com/l/meetup-join/..."
             value={meeting.zoomUrl}
             onChange={(e) => dispatch({ type: 'ZOOM_URL_CHANGED', url: e.target.value })}
             disabled={isActive ?? false}
