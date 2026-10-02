@@ -1,4 +1,5 @@
 import type { Config } from "../config.js";
+import { type Platform } from "./platform.js";
 
 /**
  * Recall.ai REST API client.
@@ -76,9 +77,9 @@ export class RecallService {
     botName: string,
     avatarUrl?: string,
     _webhookUrl?: string,
+    platform: Platform = "zoom",
   ): Promise<Record<string, unknown>> {
     const payload: Record<string, unknown> = {
-      meeting_url: meetingUrl,
       bot_name: botName,
       recording_config: {
         transcript: {
@@ -105,6 +106,14 @@ export class RecallService {
         microsoft_teams: "web_4_core",
       },
     };
+
+    // Carry the join URL in the platform-specific field. Zoom keeps the
+    // existing flat `meeting_url`; Teams uses `microsoft_teams_join_url`.
+    if (platform === "teams") {
+      payload.microsoft_teams_join_url = meetingUrl;
+    } else {
+      payload.meeting_url = meetingUrl;
+    }
 
     if (avatarUrl) {
       payload.output_media = {
