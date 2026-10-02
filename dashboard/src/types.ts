@@ -49,6 +49,17 @@ export interface SessionConfig {
   autoSpeak?: boolean;
   systemPrompt?: string;
   personality?: Personality;
+  /**
+   * Whether the server nudges Kira when it detects she was directly addressed
+   * in the transcript. When undefined, the env default is used. When false,
+   * detection is skipped and the server defers to HeyGen.
+   */
+  transcriptNudgeEnabled?: boolean;
+  /**
+   * Guard window (ms) after a detected direct address (roughly 5s
+   * double-response guard). When undefined, the env default is used.
+   */
+  transcriptNudgeWindowMs?: number;
 }
 
 export interface Session {
@@ -239,4 +250,6 @@ export interface ConfigDefaults {
   availableVoices: string[];
   availableStyles: string[];
   personality: Personality;
+  transcriptNudgeEnabled?: boolean;
+  transcriptNudgeWindowMs?: number;
 }

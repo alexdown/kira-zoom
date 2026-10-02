@@ -20,9 +20,11 @@ function getChromaKeyOptions() {
 interface HeyGenAvatarProps {
   onError: (error: string) => void;
   sessionRef: React.MutableRefObject<any>;
+  /** Reports HeyGen avatar-speaking transitions to the parent (server nudge guard). */
+  onAvatarSpeakingChange?: (speaking: boolean) => void;
 }
 
-export default function HeyGenAvatar({ onError, sessionRef }: HeyGenAvatarProps) {
+export default function HeyGenAvatar({ onError, sessionRef, onAvatarSpeakingChange }: HeyGenAvatarProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hasInitialized = useRef(false);
@@ -69,6 +71,12 @@ export default function HeyGenAvatar({ onError, sessionRef }: HeyGenAvatarProps)
       }
     };
   }, [isStreamReady]);
+
+  // Report avatar-speaking transitions to the server (via parent) so the
+  // transcript-nudge guard can tell when HeyGen already answered.
+  useEffect(() => {
+    onAvatarSpeakingChange?.(isAvatarTalking);
+  }, [isAvatarTalking, onAvatarSpeakingChange]);
 
   // Report errors to parent for fallback
   useEffect(() => {

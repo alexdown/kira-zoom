@@ -29,6 +29,19 @@ export interface Config {
   heygenAvatarId: string;
   heygenVoiceId: string;
   heygenContextId: string;
+  // Address detection / nudge
+  /**
+   * Default for whether the server nudges Kira when it detects she was directly
+   * addressed in the transcript. When false, detection is skipped entirely and
+   * the server defers to HeyGen to decide when Kira speaks.
+   */
+  transcriptNudgeEnabled: boolean;
+  /**
+   * Guard window (ms) after a detected direct address. The nudge is only sent
+   * if the avatar has not started speaking within this window (double-response
+   * guard). Default is about 5000 ms.
+   */
+  transcriptNudgeWindowMs: number;
 }
 
 function requireEnv(name: string): string {
@@ -37,6 +50,21 @@ function requireEnv(name: string): string {
     throw new Error(`Missing required environment variable: ${name}`);
   }
   return value;
+}
+
+/**
+ * Parse the transcript-nudge guard window (ms) from an env value, falling back
+ * to a sane default when the value is missing or non-numeric. Guards against a
+ * misconfigured TRANSCRIPT_NUDGE_WINDOW_MS producing NaN, which would make
+ * setTimeout(NaN) fire immediately and collapse the double-response guard to a
+ * zero-length window. Exported for unit testing.
+ */
+export function parseNudgeWindowMs(
+  raw: string | undefined,
+  fallback = 5000,
+): number {
+  const parsed = parseInt(raw ?? "", 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
 export function loadConfig(): Config {
@@ -64,5 +92,13 @@ export function loadConfig(): Config {
       process.env.HEYGEN_VOICE_ID ?? "b2bd6569-a537-4342-aeca-a1f15d2a2c97",
     heygenContextId:
       process.env.HEYGEN_CONTEXT_ID ?? "4aff4b76-74af-4329-8910-705585d08fad",
+    // Address detection / nudge
+    transcriptNudgeEnabled: !["false", "0"].includes(
+      (process.env.TRANSCRIPT_NUDGE_ENABLED ?? "true").trim().toLowerCase(),
+    ),
+    transcriptNudgeWindowMs: parseNudgeWindowMs(
+      process.env.TRANSCRIPT_NUDGE_WINDOW_MS,
+      5000,
+    ),
   };
 }

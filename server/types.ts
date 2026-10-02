@@ -59,6 +59,19 @@ export interface SessionConfig {
   systemPrompt?: string;
   /** Bot personality settings */
   personality?: Personality;
+  /**
+   * Whether the server nudges Kira when it detects she was directly addressed
+   * in the transcript. When undefined, the env default is used. When false,
+   * detection is skipped entirely and the server defers to HeyGen to decide
+   * when Kira speaks.
+   */
+  transcriptNudgeEnabled?: boolean;
+  /**
+   * Guard window (ms) after a detected direct address. The nudge is sent only
+   * if the avatar has not started speaking within this window (the roughly 5s
+   * double-response guard). When undefined, the env default is used.
+   */
+  transcriptNudgeWindowMs?: number;
 }
 
 export interface Session {
