@@ -3,13 +3,13 @@
 Tracking: GitHub issue #7. Each task maps to requirements in `requirements.md`
 and the components in `design.md`. Check off tasks as they complete.
 
-- [ ] 1. Environment setup and baseline
+- [x] 1. Environment setup and baseline
   - Run `npm install` at the worktree root and `npm install` in `dashboard/`.
   - Confirm baseline is green: `npm run typecheck` (server) and
     `npm run build` in `dashboard/`.
   - _Requirements: 5.2_
 
-- [ ] 2. Add shared platform-detection helper
+- [x] 2. Add shared platform-detection helper
   - Create `server/services/platform.ts` exporting
     `type Platform = "zoom" | "teams"` and
     `detectPlatform(meetingUrl: string): Platform`.
@@ -18,7 +18,7 @@ and the components in `design.md`. Check off tasks as they complete.
     malformed/unparseable URL → `"zoom"` (never throws).
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 3. Thread platform into `createBot` and switch the join-URL field
+- [x] 3. Thread platform into `createBot` and switch the join-URL field
   - In `server/services/recall.ts`, add a trailing optional parameter
     `platform: Platform = "zoom"` to `createBot` (import `Platform` from
     `./platform.js`).
@@ -29,7 +29,7 @@ and the components in `design.md`. Check off tasks as they complete.
     `output_media` attachment exactly as they are today.
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 3.1, 3.3, 5.1_
 
-- [ ] 4. Detect platform once in the session route and pass it through
+- [x] 4. Detect platform once in the session route and pass it through
   - In `server/routes/sessions.ts`, import `detectPlatform` from
     `../services/platform.js`.
   - After validating `body.meetingUrl`, compute

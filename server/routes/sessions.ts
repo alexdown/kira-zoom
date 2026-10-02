@@ -3,6 +3,7 @@ import type { Config } from "../config.js";
 import { DEFAULT_SYSTEM_PROMPT } from "../config.js";
 import type { SessionManager } from "../services/session-manager.js";
 import type { RecallService } from "../services/recall.js";
+import { detectPlatform } from "../services/platform.js";
 import type { LLMService } from "../services/llm.js";
 import { SessionState } from "../types.js";
 import type { CreateSessionRequest } from "../types.js";
@@ -68,6 +69,9 @@ export function createSessionsRouter(
         res.status(400).json({ error: "meetingUrl is required" });
         return;
       }
+
+      const platform = detectPlatform(body.meetingUrl);
+      console.log(`[Session] Detected platform: ${platform}`);
 
       const botName = body.botName ?? config.defaultBotName;
       const sessionConfig = body.config ?? {};
@@ -191,6 +195,7 @@ export function createSessionsRouter(
           botName,
           avatarUrl,
           config.webhookBaseUrl,
+          platform,
         );
 
         session.botId = botResult.id as string;
